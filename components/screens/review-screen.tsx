@@ -6,6 +6,7 @@ import { motion } from "framer-motion"
 import { Loader2 } from "lucide-react"
 import type { CourseData } from "@/types/course"
 import { generateAdditionalMaterials } from "@/app/actions/openai-actions"
+import CourseRoaster from "@/components/course-roaster"
 
 interface ReviewScreenProps {
   courseData: CourseData
@@ -154,6 +155,9 @@ export default function ReviewScreen({ courseData, updateCourseData, onNext, onP
         </div>
       </div>
 
+      {/* Add the Course Roaster component */}
+      <CourseRoaster courseData={courseData} />
+
       <div className="flex justify-between mt-8">
         <Button variant="outline" onClick={onPrev}>
           Atrás
@@ -172,4 +176,3 @@ export default function ReviewScreen({ courseData, updateCourseData, onNext, onP
     </motion.div>
   )
 }
-

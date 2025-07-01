@@ -3,8 +3,6 @@ import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
 import { loadCourseData } from "@/lib/storage-utils"
 import { useState, useEffect } from "react"
-// Import the Header component
-import Header from "@/components/header"
 
 export default function Home() {
   const router = useRouter()
@@ -52,10 +50,8 @@ export default function Home() {
     return null // No renderizar nada durante SSR
   }
 
-  // Add the Header component at the beginning of the main element
   return (
     <main className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
-      <Header showBackToHome={false} />
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-bold text-blue-800">Whorkshop</h1>
@@ -150,4 +146,3 @@ export default function Home() {
     </main>
   )
 }
-

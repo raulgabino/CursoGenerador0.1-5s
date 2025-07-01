@@ -170,4 +170,3 @@ export default function EvaluationScreen({ courseData, updateCourseData, onNext,
     </motion.div>
   )
 }
-

@@ -17,4 +17,3 @@ export interface CourseData {
   location?: string
   platform?: string
 }
-

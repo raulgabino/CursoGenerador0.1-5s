@@ -8,6 +8,7 @@ import { generatePDF } from "@/services/openai-service"
 import { generatePresentation, generatePPTX } from "@/services/presentation-service"
 import PresentationViewer from "@/components/presentation-viewer"
 import { FileText, PresentationIcon, Loader2 } from "lucide-react"
+import CourseRoaster from "@/components/course-roaster"
 
 interface FinalScreenProps {
   courseData: CourseData
@@ -88,38 +89,7 @@ export default function FinalScreen({ courseData, onReset }: FinalScreenProps) {
 
   const handleDownloadPresentation = async () => {
     if (!presentation) {
-      // If no presentation exists, generate one first
-      try {
-        setIsDownloadingPPTX(true)
-        setError(null)
-
-        console.log("Generating presentation for download...")
-        const presentationData = await generatePresentation(courseData)
-        setPresentation(presentationData)
-
-        // Now generate and download the PPTX
-        console.log("Generating PPTX file...")
-        const pptxBlob = await generatePPTX(presentationData)
-
-        // Create a URL for the blob
-        const url = URL.createObjectURL(pptxBlob)
-
-        // Create an <a> element to download the PPTX
-        const link = document.createElement("a")
-        link.href = url
-        link.download = `${courseData.title.replace(/\s+/g, "_")}_presentacion.pptx`
-        document.body.appendChild(link)
-        link.click()
-
-        // Clean up
-        document.body.removeChild(link)
-        URL.revokeObjectURL(url)
-      } catch (error: any) {
-        console.error("Error generating and downloading presentation:", error)
-        setError(`Error: ${error.message || "No se pudo generar la presentación"}`)
-      } finally {
-        setIsDownloadingPPTX(false)
-      }
+      setError("No hay presentación generada para descargar.")
       return
     }
 
@@ -175,7 +145,9 @@ export default function FinalScreen({ courseData, onReset }: FinalScreenProps) {
           </svg>
         </div>
         <h2 className="text-2xl font-bold text-blue-800 mb-2">¡Curso generado con éxito!</h2>
-        <p className="text-gray-600">Tu curso "{courseData.title}" está listo para ser descargado y utilizado.</p>
+        <p className="text-gray-600">
+          Tu curso "{courseData?.title || "sin título"}" está listo para ser descargado y utilizado.
+        </p>
       </div>
 
       {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-6">{error}</div>}
@@ -226,16 +198,17 @@ export default function FinalScreen({ courseData, onReset }: FinalScreenProps) {
         </div>
       </div>
 
+      {/* Add the Course Roaster component */}
+      <div className="mb-8">
+        <h3 className="font-bold text-lg text-blue-700 mb-4">¿Quieres una opinión diferente?</h3>
+        <CourseRoaster courseData={courseData} />
+      </div>
+
       <div className="flex flex-col items-center">
         <p className="text-gray-600 mb-4">¿Quieres crear otro curso?</p>
-        <div className="flex flex-col sm:flex-row gap-3">
-          <Button onClick={onReset} variant="outline">
-            Crear nuevo curso
-          </Button>
-          <Button onClick={() => (window.location.href = "/")} variant="secondary">
-            Volver al inicio
-          </Button>
-        </div>
+        <Button onClick={onReset} variant="outline">
+          Crear nuevo curso
+        </Button>
       </div>
 
       {showPresentationViewer && presentation && (
@@ -249,4 +222,3 @@ export default function FinalScreen({ courseData, onReset }: FinalScreenProps) {
     </motion.div>
   )
 }
-

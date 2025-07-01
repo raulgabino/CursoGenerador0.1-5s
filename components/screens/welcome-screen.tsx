@@ -104,19 +104,9 @@ export default function WelcomeScreen({ onNext }: WelcomeScreenProps) {
         </ol>
       </div>
 
-      <div className="flex flex-col sm:flex-row justify-center gap-3">
-        <Button onClick={handleNext} className="bg-blue-600 hover:bg-blue-700 px-8 py-2">
-          Comenzar diseño del curso
-        </Button>
-        <Button
-          onClick={() => (window.location.href = "/")}
-          variant="outline"
-          className="border-blue-300 text-blue-600 hover:bg-blue-50"
-        >
-          Volver al inicio
-        </Button>
-      </div>
+      <Button onClick={handleNext} className="bg-blue-600 hover:bg-blue-700 px-8 py-2">
+        Comenzar diseño del curso
+      </Button>
     </motion.div>
   )
 }
-

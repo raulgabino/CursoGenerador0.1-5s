@@ -31,7 +31,7 @@ export async function generateAdditionalMaterials(courseData: CourseData): Promi
     console.log("Generating additional materials for course:", courseData.title)
 
     const prompt = `
-    Genera una lista completa de materiales adicionales recomendados para un curso titulado "${courseData.title}" 
+    Genera una lista de materiales adicionales recomendados para un curso titulado "${courseData.title}" 
     dirigido a "${courseData.audience || "estudiantes"}".
     
     Información del curso:
@@ -40,20 +40,12 @@ export async function generateAdditionalMaterials(courseData: CourseData): Promi
     - Estructura: "${courseData.structure || "No especificada"}"
     - Evaluación: "${courseData.evaluationMethod || "No especificada"}"
     
-    Proporciona una lista detallada que incluya:
-    1. Bibliografía recomendada (3-5 libros con autores y títulos reales)
-    2. Recursos digitales verificados (sitios web, plataformas de aprendizaje)
-    3. Contenido audiovisual relevante (canales de YouTube, podcasts, etc.)
-    4. Herramientas y software útiles para el aprendizaje
-    5. Materiales específicos para cada módulo principal
+    Proporciona una lista organizada de:
+    1. Libros recomendados (3-5)
+    2. Recursos en línea (sitios web, cursos, videos)
+    3. Herramientas útiles para el aprendizaje
     
-    Cada recurso debe ser:
-    - Real y verificable (con títulos y autores reales para libros)
-    - Relevante y específico para el tema del curso
-    - Accesible para la audiencia objetivo
-    - Actualizado y de alta calidad
-    
-    Formatea la respuesta en Markdown, organizando los recursos por categorías claras.
+    Formato la respuesta en Markdown.
     `
 
     const response = await openai.chat.completions.create({
@@ -62,7 +54,7 @@ export async function generateAdditionalMaterials(courseData: CourseData): Promi
         {
           role: "system",
           content:
-            "Eres un experto en diseño instruccional y educación. Tu tarea es recomendar materiales adicionales de alta calidad, específicos y verificables para complementar un curso.",
+            "Eres un experto en diseño instruccional y educación. Tu tarea es recomendar materiales adicionales de alta calidad para complementar un curso.",
         },
         {
           role: "user",
@@ -77,7 +69,7 @@ export async function generateAdditionalMaterials(courseData: CourseData): Promi
 
     if (!content || content.trim() === "") {
       console.error("Empty response from OpenAI API")
-      return generarContenidoFallback(courseData)
+      throw new Error("La respuesta de la API está vacía")
     }
 
     return content
@@ -92,202 +84,24 @@ export async function generateAdditionalMaterials(courseData: CourseData): Promi
       })
     }
 
-    // Provide improved fallback content without error messages
-    return generarContenidoFallback(courseData)
-  }
-}
-
-// Helper function to generate fallback content based on course data
-function generarContenidoFallback(courseData: CourseData): string {
-  const titulo = courseData.title || "este tema"
-  const audiencia = courseData.audience || "estudiantes"
-
-  // Extract keywords from course data for more relevant suggestions
-  const keywords = [
-    courseData.title || "",
-    courseData.problem || "",
-    courseData.purpose || "",
-    courseData.audience || "",
-  ]
-    .join(" ")
-    .toLowerCase()
-
-  // Determine the general field based on keywords
-  let campo = "pedagogía"
-  if (keywords.match(/program|código|software|web|app|computadora|informática|desarrollo/)) {
-    campo = "programación"
-  } else if (keywords.match(/market|venta|cliente|negocio|emprendimiento|empresa/)) {
-    campo = "marketing"
-  } else if (keywords.match(/diseño|arte|creatividad|visual|gráfico/)) {
-    campo = "diseño"
-  } else if (keywords.match(/salud|medicina|enfermería|cuidado|bienestar/)) {
-    campo = "salud"
-  }
-
-  // Generate specific resources based on identified field
-  let libros, sitiosWeb, videos, herramientas
-
-  switch (campo) {
-    case "programación":
-      libros = [
-        '"Clean Code" por Robert C. Martin',
-        '"JavaScript: The Good Parts" por Douglas Crockford',
-        '"Learning Python" por Mark Lutz',
-        '"Designing Data-Intensive Applications" por Martin Kleppmann',
-      ]
-      sitiosWeb = [
-        "MDN Web Docs: documentación completa sobre desarrollo web",
-        "freeCodeCamp: cursos gratuitos de programación",
-        "Stack Overflow: comunidad de preguntas y respuestas para programadores",
-        "GitHub Learning Lab: proyectos prácticos para aprender programación",
-      ]
-      videos = [
-        'Canal de YouTube "Traversy Media": tutoriales de desarrollo web',
-        'Canal de YouTube "The Net Ninja": tutoriales detallados sobre diferentes tecnologías',
-        'Podcast "Syntax": discusiones sobre desarrollo web moderno',
-      ]
-      herramientas = [
-        "Visual Studio Code: editor de código con extensiones para múltiples lenguajes",
-        "GitHub: plataforma de control de versiones y colaboración",
-        "CodePen: entorno para experimentar con código frontend",
-        "replit: IDE en línea para practicar programación",
-      ]
-      break
-
-    case "marketing":
-      libros = [
-        '"Marketing 4.0" por Philip Kotler',
-        '"This Is Marketing" por Seth Godin',
-        '"Building a StoryBrand" por Donald Miller',
-        '"Contagious: How to Build Word of Mouth in the Digital Age" por Jonah Berger',
-      ]
-      sitiosWeb = [
-        "HubSpot Academy: cursos gratuitos de marketing digital",
-        "Neil Patel Blog: recursos y guías de marketing digital",
-        "Think with Google: tendencias y estudios de marketing",
-        "Social Media Examiner: guías y tutoriales de marketing en redes sociales",
-      ]
-      videos = [
-        'Canal de YouTube "Marketing Digital 360": estrategias de marketing en español',
-        'Podcast "Marketing School" con Neil Patel y Eric Siu',
-        "Webinars de HubSpot sobre estrategias de marketing",
-      ]
-      herramientas = [
-        "Google Analytics: análisis de tráfico web",
-        "Mailchimp: plataforma de email marketing",
-        "Canva: diseño gráfico para redes sociales",
-        "SEMrush: herramienta de SEO y análisis de competencia",
-      ]
-      break
-
-    case "diseño":
-      libros = [
-        '"Don\'t Make Me Think" por Steve Krug',
-        '"The Design of Everyday Things" por Don Norman',
-        '"Thinking with Type" por Ellen Lupton',
-        '"Logo Design Love" por David Airey',
-      ]
-      sitiosWeb = [
-        "Behance: plataforma de portafolios creativos",
-        "Dribbble: comunidad de diseñadores",
-        "Smashing Magazine: artículos sobre diseño web",
-        "UI Patterns: biblioteca de patrones de diseño de interfaz",
-      ]
-      videos = [
-        'Canal de YouTube "The Futur": contenido sobre diseño y negocios creativos',
-        'Canal de YouTube "CharliMarieTV": consejos para diseñadores web',
-        'Podcast "Design Matters" con Debbie Millman',
-      ]
-      herramientas = [
-        "Adobe Creative Cloud: suite de aplicaciones de diseño",
-        "Figma: herramienta de diseño colaborativo",
-        "Sketch: aplicación de diseño de interfaces",
-        "InVision: plataforma de prototipado y colaboración",
-      ]
-      break
-
-    case "salud":
-      libros = [
-        '"Being Mortal" por Atul Gawande',
-        '"The Body: A Guide for Occupants" por Bill Bryson',
-        '"How Doctors Think" por Jerome Groopman',
-        '"Why We Sleep" por Matthew Walker',
-      ]
-      sitiosWeb = [
-        "Mayo Clinic: información médica verificada",
-        "Medscape: recursos para profesionales de la salud",
-        "Khan Academy Medicine: contenido educativo sobre medicina",
-        "BMJ Learning: plataforma de aprendizaje médico",
-      ]
-      videos = [
-        'Canal de YouTube "Osmosis": videos educativos sobre medicina',
-        'Canal de YouTube "Ninja Nerd": explicaciones detalladas de anatomía y fisiología',
-        'Podcast "Science Vs": análisis científico de temas de salud',
-      ]
-      herramientas = [
-        "Complete Anatomy: aplicación 3D de anatomía",
-        "Epocrates: base de datos de medicamentos",
-        "Virtual Patient Simulator: simulaciones clínicas",
-        "PubMed: base de datos de literatura científica",
-      ]
-      break
-
-    default:
-      libros = [
-        '"Aprendizaje Visible" por John Hattie',
-        '"Maestría" por Robert Greene',
-        '"Mindset: La actitud del éxito" por Carol S. Dweck',
-        '"El elemento" por Ken Robinson',
-      ]
-      sitiosWeb = [
-        "Coursera: cursos en línea de universidades reconocidas",
-        "Khan Academy: plataforma gratuita de aprendizaje",
-        "TED Talks: charlas inspiradoras sobre diversos temas",
-        "ERIC: base de datos de investigación educativa",
-      ]
-      videos = [
-        'Canal de YouTube "CrashCourse": videos educativos sobre diversos temas',
-        'Canal de YouTube "TED-Ed": lecciones animadas',
-        'Podcast "Teaching in Higher Ed": estrategias de enseñanza',
-      ]
-      herramientas = [
-        "Google Classroom: plataforma para gestionar cursos",
-        "Miro: pizarra digital colaborativa",
-        "Kahoot: plataforma para crear cuestionarios interactivos",
-        "Padlet: muro virtual colaborativo",
-      ]
-  }
-
-  return `
-## Bibliografía recomendada
-- ${libros[0]}
-- ${libros[1]}
-- ${libros[2]}
-- ${libros[3]}
+    // Provide fallback content in case of error
+    return `
+## Libros recomendados
+- "Introducción a ${courseData.title || "la materia"}" por Autor Reconocido
+- "Fundamentos de ${courseData.audience ? "enseñanza para " + courseData.audience : "pedagogía"}" por Experto Educativo
+- "Guía práctica de ${courseData.title || "enseñanza efectiva"}" por Pedagogo Destacado
 
 ## Recursos en línea
-- ${sitiosWeb[0]}
-- ${sitiosWeb[1]}
-- ${sitiosWeb[2]}
-- ${sitiosWeb[3]}
-
-## Contenido audiovisual
-- ${videos[0]}
-- ${videos[1]}
-- ${videos[2]}
+- Plataforma EdX: cursos gratuitos sobre ${courseData.title || "la materia"}
+- Canal de YouTube "Educación Innovadora"
+- Sitio web Coursera: especialización en ${courseData.title || "diseño instruccional"}
 
 ## Herramientas
-- ${herramientas[0]}
-- ${herramientas[1]}
-- ${herramientas[2]}
-- ${herramientas[3]}
-
-## Materiales específicos por módulo
-- Para la introducción: guías de conceptos básicos y estudios de caso introductorios
-- Para módulos teóricos: lecturas seleccionadas y videos explicativos
-- Para módulos prácticos: plantillas de trabajo, ejercicios guiados y problemas para resolver
-- Para la evaluación: rúbricas detalladas, ejemplos de proyectos exitosos y guías de retroalimentación
-`
+- Miro para mapas mentales colaborativos
+- Kahoot para evaluaciones interactivas
+- Canva para diseño de materiales educativos
+    `
+  }
 }
 
 /**
@@ -507,148 +321,53 @@ export async function generatePDF(courseData: CourseData): Promise<Blob> {
     const autoTableModule = await import("jspdf-autotable")
     const autoTable = autoTableModule.default
 
-    // Create a new PDF document with better default settings
-    const doc = new jsPDF({
-      orientation: "portrait",
-      unit: "mm",
-      format: "a4",
-      compress: true,
-    })
+    // Create a new PDF document
+    const doc = new jsPDF()
 
-    // Define consistent margins for better readability
-    const margin = {
-      left: 15,
-      right: 15,
-      top: 15,
-      bottom: 20,
-    }
-
-    // Define consistent spacing
-    const spacing = {
-      afterTitle: 8,
-      afterSection: 15,
-      afterTable: 20,
-      betweenElements: 10,
-    }
-
-    // Define page dimensions for content calculations
-    const pageWidth = 210 // A4 width in mm
-    const pageHeight = 297 // A4 height in mm
-    const contentWidth = pageWidth - margin.left - margin.right
-
-    // Function to check if we need a page break
-    const needsPageBreak = (currentY: number, requiredSpace: number) => {
-      return currentY + requiredSpace > pageHeight - margin.bottom
-    }
-
-    // Function to truncate text if too long
-    const truncateText = (text: string, maxLength: number): string => {
-      if (!text) return ""
-      return text.length > maxLength ? text.substring(0, maxLength - 3) + "..." : text
-    }
-
-    // Function to add a section title with consistent styling
-    const addSectionTitle = (title: string, y: number): number => {
-      doc.setFontSize(14)
-      doc.setTextColor(0, 51, 153) // Blue color
-      doc.setFont("helvetica", "bold")
-      doc.text(title, margin.left, y)
-      return y + spacing.afterTitle
-    }
-
-    // Course title and date - Cover page
-    let currentY = margin.top
-
-    // Add logo or header image if available
-    // doc.addImage("logo.png", "PNG", margin.left, currentY, 40, 15);
-    // currentY += 20;
-
-    // Title with dynamic font sizing
-    const titleMaxWidth = contentWidth
-    let titleFontSize = 24
-    doc.setFontSize(titleFontSize)
+    // Course title and date
+    doc.setFontSize(24)
     doc.setTextColor(0, 51, 153) // Blue color
-    doc.setFont("helvetica", "bold")
+    doc.text(courseData.title, 105, 20, { align: "center" })
 
-    // Check if title is too long and reduce font size if needed
-    while (doc.getTextWidth(courseData.title) > titleMaxWidth && titleFontSize > 14) {
-      titleFontSize -= 2
-      doc.setFontSize(titleFontSize)
-    }
-
-    // Split long titles into multiple lines if needed
-    const splitTitle = doc.splitTextToSize(courseData.title, titleMaxWidth)
-    doc.text(splitTitle, pageWidth / 2, currentY, { align: "center" })
-
-    // Update current Y position based on title height
-    currentY += splitTitle.length * (titleFontSize * 0.35) + spacing.afterTitle
-
-    // Add date
     doc.setFontSize(10)
     doc.setTextColor(100, 100, 100)
-    doc.setFont("helvetica", "normal")
-    const dateText = `Generado el ${new Date().toLocaleDateString()}`
-    doc.text(dateText, pageWidth / 2, currentY, { align: "center" })
-    currentY += spacing.betweenElements * 2
+    doc.text(`Generado el ${new Date().toLocaleDateString()}`, 105, 28, { align: "center" })
 
-    // General information section
-    currentY = addSectionTitle("Información General del Curso", currentY)
-    currentY += spacing.betweenElements / 2
+    // Cover - General information
+    doc.setFontSize(14)
+    doc.setTextColor(0, 51, 153)
+    doc.text("Información General del Curso", 14, 40)
+
+    doc.setFontSize(11)
+    doc.setTextColor(0, 0, 0)
 
     const generalInfo = [
       ["Público objetivo", courseData.audience || "No especificado"],
       ["Modalidad", courseData.modality || "No especificado"],
       ["Duración", courseData.duration || "No especificada"],
       ["Certificado", courseData.certificate ? "Sí" : "No"],
-      ["Problema que resuelve", truncateText(courseData.problem || "No especificado", 300)],
-      ["Propósito", truncateText(courseData.purpose || "No especificado", 300)],
-      ["Experiencia previa", truncateText(courseData.experience || "No especificado", 300)],
+      ["Problema que resuelve", courseData.problem || "No especificado"],
+      ["Propósito", courseData.purpose || "No especificado"],
+      ["Experiencia previa", courseData.experience || "No especificado"],
     ]
 
-    // Add general info table with improved styling
     autoTable(doc, {
-      startY: currentY,
+      startY: 45,
       head: [["Campo", "Detalle"]],
       body: generalInfo,
       theme: "striped",
-      headStyles: {
-        fillColor: [59, 130, 246],
-        textColor: [255, 255, 255],
-        fontStyle: "bold",
-        halign: "left",
-      },
-      styles: {
-        fontSize: 10,
-        cellPadding: 5,
-        overflow: "linebreak",
-        font: "helvetica",
-      },
+      headStyles: { fillColor: [59, 130, 246], textColor: [255, 255, 255] },
+      styles: { fontSize: 10 },
       columnStyles: {
-        0: { cellWidth: 50, fontStyle: "bold" },
-        1: { cellWidth: contentWidth - 50 },
-      },
-      margin: { left: margin.left, right: margin.right },
-      didDrawPage: (data) => {
-        // Add header and footer on each page
-        doc.setFontSize(8)
-        doc.setTextColor(150, 150, 150)
-        doc.text(`${courseData.title}`, margin.left, pageHeight - 10)
-        doc.text(`Página ${doc.getNumberOfPages()}`, pageWidth - margin.right, pageHeight - 10, { align: "right" })
+        0: { cellWidth: 50 },
+        1: { cellWidth: "auto" },
       },
     })
 
-    // Update current Y position after table
-    currentY = doc.lastAutoTable.finalY + spacing.afterTable
-
-    // Check if we need a page break before the structure section
-    if (needsPageBreak(currentY, 50)) {
-      doc.addPage()
-      currentY = margin.top
-    }
-
-    // Course structure section
-    currentY = addSectionTitle("Estructura del Curso", currentY)
-    currentY += spacing.betweenElements / 2
+    // Course structure
+    doc.setFontSize(14)
+    doc.setTextColor(0, 51, 153)
+    doc.text("Estructura del Curso", 14, doc.lastAutoTable.finalY + 15)
 
     // Process structure to display correctly
     let structureLines: string[] = []
@@ -681,53 +400,26 @@ export async function generatePDF(courseData: CourseData): Promise<Blob> {
         description = `Desarrollo de habilidades y conocimientos relacionados con ${moduleTitle}.`
       }
 
-      return [truncateText(line, 150), truncateText(description, 300)]
+      return [line, description]
     })
 
-    // Add structure table with improved styling
     autoTable(doc, {
-      startY: currentY,
+      startY: doc.lastAutoTable.finalY + 20,
       head: [["Módulo", "Descripción"]],
       body: structureData,
       theme: "striped",
-      headStyles: {
-        fillColor: [59, 130, 246],
-        textColor: [255, 255, 255],
-        fontStyle: "bold",
-        halign: "left",
-      },
-      styles: {
-        fontSize: 10,
-        cellPadding: 5,
-        overflow: "linebreak",
-        font: "helvetica",
-      },
+      headStyles: { fillColor: [59, 130, 246], textColor: [255, 255, 255] },
+      styles: { fontSize: 10 },
       columnStyles: {
-        0: { cellWidth: 80, fontStyle: "bold" },
-        1: { cellWidth: contentWidth - 80 },
-      },
-      margin: { left: margin.left, right: margin.right },
-      didDrawPage: (data) => {
-        // Add header and footer on each page
-        doc.setFontSize(8)
-        doc.setTextColor(150, 150, 150)
-        doc.text(`${courseData.title}`, margin.left, pageHeight - 10)
-        doc.text(`Página ${doc.getNumberOfPages()}`, pageWidth - margin.right, pageHeight - 10, { align: "right" })
+        0: { cellWidth: 80 },
+        1: { cellWidth: "auto" },
       },
     })
 
-    // Update current Y position after table
-    currentY = doc.lastAutoTable.finalY + spacing.afterTable
-
-    // Check if we need a page break before the evaluation section
-    if (needsPageBreak(currentY, 80)) {
-      doc.addPage()
-      currentY = margin.top
-    }
-
-    // Evaluation section
-    currentY = addSectionTitle("Plan de Evaluación", currentY)
-    currentY += spacing.betweenElements
+    // Evaluation
+    doc.setFontSize(14)
+    doc.setTextColor(0, 51, 153)
+    doc.text("Plan de Evaluación", 14, doc.lastAutoTable.finalY + 15)
 
     // Create a detailed evaluation plan based on provided data
     let evaluationPlan = ""
@@ -753,25 +445,24 @@ export async function generatePDF(courseData: CourseData): Promise<Blob> {
 
     doc.setFontSize(11)
     doc.setTextColor(0, 0, 0)
-    doc.setFont("helvetica", "normal")
-
-    // Split evaluation text into multiple lines with proper line breaks
-    const splitEvaluation = doc.splitTextToSize(evaluationPlan, contentWidth)
-    doc.text(splitEvaluation, margin.left, currentY)
+    const splitEvaluation = doc.splitTextToSize(evaluationPlan, 180)
+    doc.text(splitEvaluation, 14, doc.lastAutoTable.finalY + 25)
 
     // Calculate Y position after evaluation text
     const evaluationTextHeight = splitEvaluation.length * 5 // Approximately 5 units per line
-    currentY += evaluationTextHeight + spacing.afterSection
+    let currentY = doc.lastAutoTable.finalY + 25 + evaluationTextHeight + 15
 
-    // Check if we need a page break before the materials section
-    if (needsPageBreak(currentY, 100)) {
+    // Check if we need a new page
+    if (currentY > 270) {
       doc.addPage()
-      currentY = margin.top
+      currentY = 20
     }
 
-    // Materials section
-    currentY = addSectionTitle("Materiales y Recursos", currentY)
-    currentY += spacing.betweenElements
+    // Materials
+    doc.setFontSize(14)
+    doc.setTextColor(0, 51, 153)
+    doc.text("Materiales y Recursos", 14, currentY)
+    currentY += 10
 
     // Process materials
     let materialsLines: string[] = []
@@ -804,50 +495,31 @@ export async function generatePDF(courseData: CourseData): Promise<Blob> {
         category = "Actividad"
       }
 
-      return [truncateText(material, 150), category]
+      return [material, category]
     })
 
-    // Add materials table with improved styling
     autoTable(doc, {
       startY: currentY,
       head: [["Material", "Categoría"]],
       body: materialsData,
       theme: "striped",
-      headStyles: {
-        fillColor: [59, 130, 246],
-        textColor: [255, 255, 255],
-        fontStyle: "bold",
-        halign: "left",
-      },
-      styles: {
-        fontSize: 10,
-        cellPadding: 5,
-        overflow: "linebreak",
-        font: "helvetica",
-      },
-      margin: { left: margin.left, right: margin.right },
-      didDrawPage: (data) => {
-        // Add header and footer on each page
-        doc.setFontSize(8)
-        doc.setTextColor(150, 150, 150)
-        doc.text(`${courseData.title}`, margin.left, pageHeight - 10)
-        doc.text(`Página ${doc.getNumberOfPages()}`, pageWidth - margin.right, pageHeight - 10, { align: "right" })
-      },
+      headStyles: { fillColor: [59, 130, 246], textColor: [255, 255, 255] },
+      styles: { fontSize: 10 },
     })
-
-    // Update current Y position after table
-    currentY = doc.lastAutoTable.finalY + spacing.afterTable
 
     // Additional materials if they exist
     if (courseData.additionalMaterials && courseData.additionalMaterialsContent) {
-      // Check if we need a page break before additional materials
-      if (needsPageBreak(currentY, 100)) {
+      currentY = doc.lastAutoTable.finalY + 15
+
+      // Check if we need a new page
+      if (currentY > 270) {
         doc.addPage()
-        currentY = margin.top
+        currentY = 20
       }
 
-      currentY = addSectionTitle("Materiales Adicionales Recomendados", currentY)
-      currentY += spacing.betweenElements
+      doc.setFontSize(14)
+      doc.setTextColor(0, 51, 153)
+      doc.text("Materiales Adicionales Recomendados", 14, currentY)
 
       // Process additional materials content
       const additionalContent = courseData.additionalMaterialsContent
@@ -863,84 +535,14 @@ export async function generatePDF(courseData: CourseData): Promise<Blob> {
         .map((line) => line.trim())
         .filter((line) => line.length > 0)
 
-      // Group lines by section for better organization
-      const groupedLines: string[][] = []
-      let currentGroup: string[] = []
+      const additionalData = additionalLines.map((line) => [line])
 
-      additionalLines.forEach((line) => {
-        if (line.startsWith("- ") || line.startsWith("* ")) {
-          // This is a list item, add to current group
-          currentGroup.push(line)
-        } else if (line.length > 0) {
-          // This might be a section header, start a new group
-          if (currentGroup.length > 0) {
-            groupedLines.push([...currentGroup])
-            currentGroup = []
-          }
-          currentGroup.push(line)
-        }
+      autoTable(doc, {
+        startY: currentY + 5,
+        body: additionalData,
+        theme: "plain",
+        styles: { fontSize: 9, cellPadding: 2 },
       })
-
-      // Add the last group if not empty
-      if (currentGroup.length > 0) {
-        groupedLines.push(currentGroup)
-      }
-
-      // Create tables for each group with better styling
-      for (const group of groupedLines) {
-        // Check if we need a page break
-        if (needsPageBreak(currentY, 50)) {
-          doc.addPage()
-          currentY = margin.top
-        }
-
-        // Add section header if first line looks like a header
-        if (group[0] && !group[0].startsWith("- ") && !group[0].startsWith("* ")) {
-          doc.setFontSize(12)
-          doc.setTextColor(0, 51, 153)
-          doc.setFont("helvetica", "bold")
-          doc.text(group[0], margin.left, currentY)
-          currentY += spacing.betweenElements
-
-          // Skip the header in the table data
-          const tableData = group.slice(1).map((line) => [line.replace(/^[-*]\s+/, "")])
-
-          if (tableData.length > 0) {
-            autoTable(doc, {
-              startY: currentY,
-              body: tableData,
-              theme: "plain",
-              styles: {
-                fontSize: 9,
-                cellPadding: 3,
-                overflow: "linebreak",
-                font: "helvetica",
-              },
-              margin: { left: margin.left + 5, right: margin.right },
-            })
-
-            currentY = doc.lastAutoTable.finalY + spacing.betweenElements
-          }
-        } else {
-          // All items are list items, just create a table
-          const tableData = group.map((line) => [line.replace(/^[-*]\s+/, "")])
-
-          autoTable(doc, {
-            startY: currentY,
-            body: tableData,
-            theme: "plain",
-            styles: {
-              fontSize: 9,
-              cellPadding: 3,
-              overflow: "linebreak",
-              font: "helvetica",
-            },
-            margin: { left: margin.left, right: margin.right },
-          })
-
-          currentY = doc.lastAutoTable.finalY + spacing.betweenElements
-        }
-      }
     }
 
     // Footer on all pages
@@ -949,10 +551,8 @@ export async function generatePDF(courseData: CourseData): Promise<Blob> {
       doc.setPage(i)
       doc.setFontSize(8)
       doc.setTextColor(150, 150, 150)
-      doc.text(`Generado con Whorkshop - Página ${i} de ${totalPages}`, pageWidth / 2, pageHeight - 10, {
-        align: "center",
-      })
-      doc.text(`${courseData.title}`, margin.left, pageHeight - 10)
+      doc.text(`Generado con Whorkshop - Página ${i} de ${totalPages}`, 105, 290, { align: "center" })
+      doc.text(`${courseData.title}`, 14, 290)
     }
 
     // Convert document to Blob
@@ -983,17 +583,3 @@ export async function generatePDF(courseData: CourseData): Promise<Blob> {
     }
   }
 }
-
-/**
- * Generate a preview PDF for a course
- */
-export async function generatePDFPreview(courseData: CourseData): Promise<string> {
-  try {
-    const pdfBlob = await generatePDF(courseData)
-    return URL.createObjectURL(pdfBlob)
-  } catch (error) {
-    console.error("Error generating PDF preview:", error)
-    throw error
-  }
-}
-

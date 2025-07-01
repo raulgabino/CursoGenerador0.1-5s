@@ -42,7 +42,7 @@ export default function Error({
             Intentar de nuevo
           </Button>
           <Link href="/">
-            <Button variant="outline" className="w-full border-blue-300 text-blue-600 hover:bg-blue-50">
+            <Button variant="outline" className="w-full">
               Volver al inicio
             </Button>
           </Link>
@@ -51,4 +51,3 @@ export default function Error({
     </div>
   )
 }
-

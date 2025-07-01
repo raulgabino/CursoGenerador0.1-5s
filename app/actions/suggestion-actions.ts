@@ -2,6 +2,7 @@
 
 import OpenAI from "openai"
 import type { CourseData } from "@/types/course"
+import { generateExpertContext } from "@/services/context-service"
 
 // Initialize OpenAI client (server-side only)
 const openai = new OpenAI({
@@ -29,21 +30,40 @@ export async function generateCourseStructure(courseData: Partial<CourseData>): 
   try {
     console.log("Generating course structure for:", courseData.title)
 
-    const prompt = `
-    Genera una estructura de curso detallada para un curso titulado "${courseData.title}" 
-    dirigido a "${courseData.audience || "estudiantes"}".
-    
-    Información del curso:
-    - Problema que resuelve: "${courseData.problem || "No especificado"}"
-    - Propósito: "${courseData.purpose || "No especificado"}"
-    - Experiencia previa requerida: "${courseData.experience || "No especificada"}"
-    
+    // Obtener contexto enriquecido del panel de expertos
+    const { theoreticalContext, practicalContext } = await generateExpertContext(courseData.title)
+
+    // Prompt mejorado que sintetiza ambos contextos
+    const finalPrompt = `
+    Eres un diseñador instruccional de élite, experto en crear planes de estudio coherentes. Tu misión es sintetizar las perspectivas de dos expertos para diseñar la estructura de un curso.
+
+    **Información del Curso:**
+    - Título: ${courseData.title}
+    - Audiencia: ${courseData.audience || "estudiantes"}
+    - Problema que resuelve: ${courseData.problem || "No especificado"}
+    - Propósito: ${courseData.purpose || "No especificado"}
+    - Experiencia previa requerida: ${courseData.experience || "No especificada"}
+    - Duración: ${courseData.duration || "un curso estándar"}
+
+    **Contexto del Experto Teórico (Análisis Académico):**
+    """
+    ${theoreticalContext}
+    """
+
+    **Contexto del Experto Práctico (Análisis de Aplicaciones):**
+    """
+    ${practicalContext}
+    """
+
+    **Tu Tarea:**
+    Basado en la SÍNTESIS de AMBOS análisis de expertos, crea una estructura de curso de 4 a 8 módulos. La estructura debe fluir lógicamente desde los fundamentos teóricos hacia las aplicaciones prácticas. Asegúrate de que cada módulo conecte la teoría con la práctica.
+
     Proporciona una estructura de curso con:
     - Entre 4 y 8 módulos numerados
     - Cada módulo debe tener un título claro y descriptivo
-    - Los módulos deben seguir una progresión lógica
+    - Los módulos deben seguir una progresión lógica que integre teoría y práctica
     - La estructura debe ser adecuada para ${courseData.duration || "un curso estándar"}
-    
+
     Formato la respuesta como una lista numerada simple, un módulo por línea.
     Ejemplo:
     1. Introducción a [tema]
@@ -57,17 +77,17 @@ export async function generateCourseStructure(courseData: Partial<CourseData>): 
         {
           role: "system",
           content:
-            "Eres un experto en diseño instruccional y educación. Tu tarea es crear estructuras de cursos efectivas y bien organizadas.",
+            "Eres un experto en diseño instruccional y educación. Tu tarea es crear estructuras de cursos efectivas y bien organizadas que integren perspectivas teóricas y prácticas.",
         },
         {
           role: "user",
-          content: prompt,
+          content: finalPrompt,
         },
       ],
       temperature: 0.7,
     })
 
-    console.log("OpenAI API response received for course structure")
+    console.log("OpenAI API response received for enhanced course structure")
     const content = response.choices[0]?.message?.content || ""
 
     if (!content || content.trim() === "") {
@@ -264,4 +284,3 @@ export async function generateEvaluationMethod(courseData: Partial<CourseData>):
     return fallbackContent
   }
 }
-

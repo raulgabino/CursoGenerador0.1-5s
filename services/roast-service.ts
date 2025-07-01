@@ -32,4 +32,3 @@ export async function generateCourseRoast(courseData: CourseData): Promise<strin
     return "Even my AI can't roast this disaster of a course. And I've seen some truly spectacular failures—I own Twitter, remember? Try again when you've got something worth my sarcastic brilliance. v0.dev deserves better input than... whatever this was."
   }
 }
-

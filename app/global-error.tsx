@@ -42,11 +42,7 @@ export default function GlobalError({
               <Button onClick={reset} className="bg-blue-600 hover:bg-blue-700 w-full">
                 Intentar de nuevo
               </Button>
-              <Button
-                onClick={() => (window.location.href = "/")}
-                variant="outline"
-                className="w-full border-blue-300 text-blue-600 hover:bg-blue-50"
-              >
+              <Button onClick={() => (window.location.href = "/")} variant="outline" className="w-full">
                 Volver al inicio
               </Button>
             </div>
@@ -56,4 +52,3 @@ export default function GlobalError({
     </html>
   )
 }
-

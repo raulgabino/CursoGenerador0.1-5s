@@ -75,4 +75,3 @@ export function clearCourseData(): void {
     console.error("Error al limpiar datos del curso:", error)
   }
 }
-

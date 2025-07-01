@@ -148,8 +148,7 @@ export default function ResultsScreen({ courseData, updateCourseData, onNext, on
         </div>
       </div>
 
-      {/* Fixed navigation buttons on mobile */}
-      <div className="flex justify-between mt-8 sticky bottom-0 bg-white py-4 border-t md:border-0 md:py-0 md:static">
+      <div className="flex justify-between mt-8">
         <Button variant="outline" onClick={onPrev}>
           Atrás
         </Button>
@@ -158,4 +157,3 @@ export default function ResultsScreen({ courseData, updateCourseData, onNext, on
     </motion.div>
   )
 }
-

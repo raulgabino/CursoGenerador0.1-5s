@@ -210,4 +210,3 @@ export default function ContentScreen({ courseData, updateCourseData, onNext, on
     </motion.div>
   )
 }
-

@@ -12,4 +12,3 @@ export async function generatePDF(courseData: CourseData): Promise<Blob> {
     throw error // Re-throw to allow proper error handling in UI
   }
 }
-

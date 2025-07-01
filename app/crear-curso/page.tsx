@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import WelcomeScreen from "@/components/screens/welcome-screen"
 import ResultsScreen from "@/components/screens/results-screen"
@@ -9,11 +10,11 @@ import EvaluationScreen from "@/components/screens/evaluation-screen"
 import ContentScreen from "@/components/screens/content-screen"
 import ReviewScreen from "@/components/screens/review-screen"
 import FinalScreen from "@/components/screens/final-screen"
+import ElonBot from "@/components/elon-bot"
 import type { CourseData } from "@/types/course"
 import { saveCourseData, loadCourseData, clearCourseData } from "@/lib/storage-utils"
 import { AlertCircle } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import Header from "@/components/header"
 
 // Datos iniciales vacíos para un nuevo curso
 const initialCourseData: CourseData = {
@@ -31,6 +32,7 @@ export default function CrearCurso() {
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isMounted, setIsMounted] = useState(false)
+  const [showElonBot, setShowElonBot] = useState(false)
 
   // Set isMounted to true when component mounts
   useEffect(() => {
@@ -68,6 +70,10 @@ export default function CrearCurso() {
         setError("Hubo un problema al cargar tus datos guardados. Se ha iniciado un nuevo curso.")
       } finally {
         setIsLoading(false)
+        // Show Elon bot after a short delay
+        setTimeout(() => {
+          setShowElonBot(true)
+        }, 1000)
       }
     }
 
@@ -108,6 +114,14 @@ export default function CrearCurso() {
     clearCourseData()
     setCourseData(initialCourseData)
     setCurrentScreen(1)
+    // Show Elon bot after reset
+    setTimeout(() => {
+      setShowElonBot(true)
+    }, 1000)
+  }
+
+  const handleCloseElonBot = () => {
+    setShowElonBot(false)
   }
 
   if (!isMounted) {
@@ -125,22 +139,29 @@ export default function CrearCurso() {
   return (
     <main className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
       <div className="container mx-auto px-4 py-8 max-w-4xl">
-        <Header showBackToHome={true} title="Diseño de Curso" />
-        <div className="mb-8 flex justify-end">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              const confirmed = window.confirm(
-                "¿Estás seguro de que quieres empezar un nuevo curso? Tus datos actuales se guardarán.",
-              )
-              if (confirmed) {
-                resetCourseData()
-              }
-            }}
-          >
-            Nuevo curso
-          </Button>
+        <div className="mb-8 flex justify-between items-center">
+          <h1 className="text-3xl font-bold text-blue-800">Whorkshop</h1>
+          <div className="flex space-x-2">
+            <Link href="/">
+              <Button variant="outline" size="sm">
+                Volver al inicio
+              </Button>
+            </Link>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                const confirmed = window.confirm(
+                  "¿Estás seguro de que quieres empezar un nuevo curso? Tus datos actuales se guardarán.",
+                )
+                if (confirmed) {
+                  resetCourseData()
+                }
+              }}
+            >
+              Nuevo curso
+            </Button>
+          </div>
         </div>
 
         {error && (
@@ -194,8 +215,7 @@ export default function CrearCurso() {
           {currentScreen === 6 && <FinalScreen courseData={courseData} onReset={resetCourseData} />}
         </div>
 
-        {/* Add extra padding at the bottom on mobile to prevent button obstruction */}
-        <div className="mt-8 flex justify-center mb-20 md:mb-8">
+        <div className="mt-8 flex justify-center">
           <div className="flex space-x-2">
             {[1, 2, 3, 4, 5, 6].map((step) => (
               <div
@@ -208,7 +228,9 @@ export default function CrearCurso() {
           </div>
         </div>
       </div>
+
+      {/* Elon Bot */}
+      {showElonBot && <ElonBot courseData={courseData} currentScreen={currentScreen} onClose={handleCloseElonBot} />}
     </main>
   )
 }
-
