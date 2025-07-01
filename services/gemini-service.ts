@@ -6,7 +6,7 @@ import { AI_CONFIG } from "@/lib/ai-config"
 // Inicializar cliente de Google Gemini
 let geminiClient: GoogleGenerativeAI | null = null
 
-function getGeminiClient(): GoogleGenerativeAI {
+async function getGeminiClient(): Promise<GoogleGenerativeAI> {
   if (!geminiClient) {
     if (!AI_CONFIG.google.apiKey) {
       throw new Error("GOOGLE_API_KEY no está configurada")
@@ -29,7 +29,7 @@ export async function generateTextWithGemini(
   },
 ): Promise<string> {
   try {
-    const client = getGeminiClient()
+    const client = await getGeminiClient()
     const model = client.getGenerativeModel({
       model: options?.model || AI_CONFIG.google.model,
       generationConfig: {
@@ -57,6 +57,6 @@ export async function generateTextWithGemini(
 }
 
 // Función para verificar si Gemini está disponible
-export function isGeminiAvailable(): boolean {
+export async function isGeminiAvailable(): Promise<boolean> {
   return !!AI_CONFIG.google.apiKey
 }

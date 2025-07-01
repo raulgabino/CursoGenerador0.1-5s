@@ -42,7 +42,7 @@ export const AI_CONFIG = {
 } as const
 
 // Función para validar que todas las API keys estén configuradas
-export function validateApiKeys() {
+export async function validateApiKeys() {
   const missingKeys: string[] = []
 
   if (!AI_CONFIG.openai.apiKey) {
@@ -77,10 +77,10 @@ export function validateApiKeys() {
 export type AIProvider = "openai" | "anthropic" | "google" | "grok"
 
 // Función para obtener el proveedor preferido basado en disponibilidad
-export function getPreferredProvider(
+export async function getPreferredProvider(
   preferredOrder: AIProvider[] = ["openai", "anthropic", "google"],
-): AIProvider | null {
-  const validation = validateApiKeys()
+): Promise<AIProvider | null> {
+  const validation = await validateApiKeys()
 
   for (const provider of preferredOrder) {
     if (validation.availableProviders[provider]) {

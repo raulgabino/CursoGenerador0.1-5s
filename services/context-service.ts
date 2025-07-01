@@ -1,7 +1,7 @@
 "use server"
 
 import Anthropic from "@anthropic-ai/sdk"
-import { GoogleGenerativeAI } from "@google-generative-ai"
+import { GoogleGenerativeAI } from "@google/generative-ai"
 
 // Función para obtener contexto teórico usando Claude
 export async function getTheoreticalContext(topic: string): Promise<string> {

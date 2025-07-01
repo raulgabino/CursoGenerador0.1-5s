@@ -6,7 +6,7 @@ import { AI_CONFIG } from "@/lib/ai-config"
 // Inicializar cliente de Anthropic
 let anthropicClient: Anthropic | null = null
 
-function getAnthropicClient(): Anthropic {
+async function getAnthropicClient(): Promise<Anthropic> {
   if (!anthropicClient) {
     if (!AI_CONFIG.anthropic.apiKey) {
       throw new Error("ANTHROPIC_API_KEY no está configurada")
@@ -31,7 +31,7 @@ export async function generateTextWithClaude(
   },
 ): Promise<string> {
   try {
-    const client = getAnthropicClient()
+    const client = await getAnthropicClient()
 
     const messages: Anthropic.Messages.MessageParam[] = [
       {
@@ -66,6 +66,6 @@ export async function generateTextWithClaude(
 }
 
 // Función para verificar si Anthropic está disponible
-export function isAnthropicAvailable(): boolean {
+export async function isAnthropicAvailable(): Promise<boolean> {
   return !!AI_CONFIG.anthropic.apiKey
 }

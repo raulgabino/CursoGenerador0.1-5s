@@ -8,7 +8,7 @@ import OpenAI from "openai"
 // Cliente OpenAI (ya existente, pero lo centralizamos aquí)
 let openaiClient: OpenAI | null = null
 
-function getOpenAIClient(): OpenAI {
+async function getOpenAIClient(): Promise<OpenAI> {
   if (!openaiClient) {
     if (!AI_CONFIG.openai.apiKey) {
       throw new Error("OPENAI_API_KEY no está configurada")
@@ -33,7 +33,7 @@ async function generateTextWithOpenAI(
   },
 ): Promise<string> {
   try {
-    const client = getOpenAIClient()
+    const client = await getOpenAIClient()
 
     const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = []
 
@@ -85,7 +85,7 @@ export async function generateTextWithAI(
   provider: AIProvider
   success: boolean
 }> {
-  const preferredProvider = options?.provider || getPreferredProvider()
+  const preferredProvider = options?.provider || (await getPreferredProvider())
   const fallbackProviders = options?.fallbackProviders || ["openai", "anthropic", "google"]
 
   // Lista de proveedores a intentar
@@ -117,12 +117,12 @@ export async function generateTextWithAI(
           break
 
         case "anthropic":
-          if (!isAnthropicAvailable()) continue
+          if (!(await isAnthropicAvailable())) continue
           text = await generateTextWithClaude(prompt, systemPrompt, options)
           break
 
         case "google":
-          if (!isGeminiAvailable()) continue
+          if (!(await isGeminiAvailable())) continue
           text = await generateTextWithGemini(prompt, systemPrompt, options)
           break
 
@@ -148,18 +148,18 @@ export async function generateTextWithAI(
 }
 
 // Función para obtener el estado de todos los proveedores
-export function getAIProvidersStatus() {
+export async function getAIProvidersStatus() {
   return {
     openai: {
       available: !!AI_CONFIG.openai.apiKey,
       model: AI_CONFIG.openai.model,
     },
     anthropic: {
-      available: isAnthropicAvailable(),
+      available: await isAnthropicAvailable(),
       model: AI_CONFIG.anthropic.model,
     },
     google: {
-      available: isGeminiAvailable(),
+      available: await isGeminiAvailable(),
       model: AI_CONFIG.google.model,
     },
     grok: {
