@@ -9,6 +9,7 @@ import { motion } from "framer-motion"
 import { Loader2, Sparkles } from "lucide-react"
 import type { CourseData } from "@/types/course"
 import { generateCourseStructure, generateMaterialSuggestions } from "@/app/actions/suggestion-actions"
+import { getExpertContextForCourse } from "@/app/actions/context-actions"
 
 interface ContentScreenProps {
   courseData: CourseData
@@ -45,14 +46,11 @@ export default function ContentScreen({ courseData, updateCourseData, onNext, on
     setAiError(null)
 
     try {
-      const structureSuggestion = await generateCourseStructure({
-        title: courseData.title,
-        audience: courseData.audience,
-        problem: courseData.problem,
-        purpose: courseData.purpose,
-        experience: courseData.experience,
-        duration: courseData.duration,
-      })
+      // Primero, obtener el contexto de los expertos
+      const expertContext = await getExpertContextForCourse({ title: courseData.title })
+
+      // Luego, generar la estructura usando el contexto obtenido
+      const structureSuggestion = await generateCourseStructure(courseData, expertContext)
 
       updateCourseData({ structure: structureSuggestion })
     } catch (error: any) {
@@ -113,7 +111,7 @@ export default function ContentScreen({ courseData, updateCourseData, onNext, on
               size="sm"
               onClick={handleGenerateStructure}
               disabled={isGeneratingStructure || !courseData.title}
-              className="flex items-center gap-1"
+              className="flex items-center gap-1 bg-transparent"
             >
               {isGeneratingStructure ? (
                 <>
@@ -155,7 +153,7 @@ export default function ContentScreen({ courseData, updateCourseData, onNext, on
               size="sm"
               onClick={handleGenerateMaterials}
               disabled={isGeneratingMaterials || !courseData.title}
-              className="flex items-center gap-1"
+              className="flex items-center gap-1 bg-transparent"
             >
               {isGeneratingMaterials ? (
                 <>

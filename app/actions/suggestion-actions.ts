@@ -2,7 +2,7 @@
 
 import OpenAI from "openai"
 import type { CourseData } from "@/types/course"
-import { generateExpertContext } from "@/services/context-service"
+// import { generateExpertContext } from "@/services/context-service"
 
 // Initialize OpenAI client (server-side only)
 const openai = new OpenAI({
@@ -20,7 +20,13 @@ function validateApiKey() {
 /**
  * Generate AI-suggested structure for a course
  */
-export async function generateCourseStructure(courseData: Partial<CourseData>): Promise<string> {
+export async function generateCourseStructure(
+  courseData: Partial<CourseData>,
+  context: {
+    theoreticalContext: string
+    practicalContext: string
+  },
+): Promise<string> {
   validateApiKey()
 
   if (!courseData || !courseData.title) {
@@ -31,7 +37,7 @@ export async function generateCourseStructure(courseData: Partial<CourseData>): 
     console.log("Generating course structure for:", courseData.title)
 
     // Obtener contexto enriquecido del panel de expertos
-    const { theoreticalContext, practicalContext } = await generateExpertContext(courseData.title)
+    // const { theoreticalContext, practicalContext } = await generateExpertContext(courseData.title)
 
     // Prompt mejorado que sintetiza ambos contextos
     const finalPrompt = `
@@ -47,12 +53,12 @@ export async function generateCourseStructure(courseData: Partial<CourseData>): 
 
     **Contexto del Experto Teórico (Análisis Académico):**
     """
-    ${theoreticalContext}
+    ${context.theoreticalContext}
     """
 
     **Contexto del Experto Práctico (Análisis de Aplicaciones):**
     """
-    ${practicalContext}
+    ${context.practicalContext}
     """
 
     **Tu Tarea:**
@@ -131,26 +137,31 @@ export async function generateMaterialSuggestions(courseData: Partial<CourseData
     console.log("Generating material suggestions for:", courseData.title)
 
     const prompt = `
-    Genera una lista de materiales y recursos recomendados para un curso titulado "${courseData.title}" 
-    dirigido a "${courseData.audience || "estudiantes"}".
-    
-    Información del curso:
-    - Problema que resuelve: "${courseData.problem || "No especificado"}"
-    - Propósito: "${courseData.purpose || "No especificado"}"
-    - Estructura: "${courseData.structure || "No especificada"}"
-    
-    Proporciona una lista de:
-    - Materiales didácticos (presentaciones, guías, etc.)
-    - Recursos multimedia (videos, podcasts, etc.)
-    - Herramientas digitales útiles para el curso
-    - Actividades prácticas recomendadas
-    
-    Formato la respuesta como una lista con viñetas (usando guiones), un material por línea.
-    Ejemplo:
-    - Presentaciones digitales para cada módulo
-    - Guías de ejercicios prácticos
-    ...
-    `
+Genera una lista de materiales y recursos recomendados para un curso titulado "${courseData.title}" 
+dirigido a "${courseData.audience || "estudiantes"}".
+
+Información del curso:
+- Problema que resuelve: "${courseData.problem || "No especificado"}"
+- Propósito: "${courseData.purpose || "No especificado"}"
+- Estructura del curso: "${courseData.structure || "No especificada"}"
+
+IMPORTANTE: Basa tus sugerencias en la estructura del curso proporcionada. Si la estructura incluye módulos específicos, sugiere materiales relevantes para esos módulos particulares.
+
+Proporciona una lista de:
+- Materiales didácticos específicos para los módulos del curso (presentaciones, guías, etc.)
+- Recursos multimedia relevantes para los temas de la estructura (videos, podcasts, etc.)
+- Herramientas digitales útiles para los contenidos específicos del curso
+- Actividades prácticas recomendadas para cada área temática de la estructura
+
+Si la estructura del curso está definida, incluye sugerencias específicas para algunos de los módulos listados para hacer la lista más útil y menos genérica.
+
+Formato la respuesta como una lista con viñetas (usando guiones), un material por línea.
+Ejemplo:
+- Presentaciones digitales para cada módulo
+- Guías de ejercicios prácticos para [módulo específico]
+- Videos tutoriales sobre [tema específico de la estructura]
+...
+`
 
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
