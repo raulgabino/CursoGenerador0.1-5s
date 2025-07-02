@@ -45,14 +45,7 @@ export default function EvaluationScreen({ courseData, updateCourseData, onNext,
     setAiError(null)
 
     try {
-      const evaluationSuggestion = await generateEvaluationMethod({
-        title: courseData.title,
-        audience: courseData.audience,
-        problem: courseData.problem,
-        purpose: courseData.purpose,
-        evaluationType: courseData.evaluationType,
-        certificate: courseData.certificate,
-      })
+      const evaluationSuggestion = await generateEvaluationMethod(courseData)
 
       updateCourseData({ evaluationMethod: evaluationSuggestion })
     } catch (error: any) {
@@ -92,7 +85,7 @@ export default function EvaluationScreen({ courseData, updateCourseData, onNext,
               size="sm"
               onClick={handleGenerateEvaluation}
               disabled={isGeneratingEvaluation || !courseData.title}
-              className="flex items-center gap-1"
+              className="flex items-center gap-1 bg-transparent"
             >
               {isGeneratingEvaluation ? (
                 <>

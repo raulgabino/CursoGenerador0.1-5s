@@ -16,4 +16,6 @@ export interface CourseData {
   lastScreen?: number
   location?: string
   platform?: string
+  theoreticalContext?: string
+  practicalContext?: string
 }

@@ -21,6 +21,8 @@ const initialCourseData: CourseData = {
   title: "",
   certificate: false,
   additionalMaterials: false,
+  theoreticalContext: "",
+  practicalContext: "",
 }
 
 export default function CrearCurso() {

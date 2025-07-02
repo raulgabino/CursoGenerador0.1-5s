@@ -46,10 +46,24 @@ export default function ContentScreen({ courseData, updateCourseData, onNext, on
     setAiError(null)
 
     try {
-      // Primero, obtener el contexto de los expertos
-      const expertContext = await getExpertContextForCourse({ title: courseData.title })
+      let expertContext
 
-      // Luego, generar la estructura usando el contexto obtenido
+      // Verificar si el contexto de los expertos ya existe
+      if (courseData.theoreticalContext && courseData.practicalContext) {
+        // Si ya existe, usar el contexto almacenado
+        expertContext = {
+          theoreticalContext: courseData.theoreticalContext,
+          practicalContext: courseData.practicalContext,
+        }
+      } else {
+        // Si no existe, generar nuevo contexto y almacenarlo
+        expertContext = await getExpertContextForCourse({ title: courseData.title })
+
+        // Actualizar el estado principal con el contexto generado
+        updateCourseData(expertContext)
+      }
+
+      // Generar la estructura usando el contexto (existente o recién generado)
       const structureSuggestion = await generateCourseStructure(courseData, expertContext)
 
       updateCourseData({ structure: structureSuggestion })
@@ -66,12 +80,18 @@ export default function ContentScreen({ courseData, updateCourseData, onNext, on
     setAiError(null)
 
     try {
-      const materialsSuggestion = await generateMaterialSuggestions({
-        title: courseData.title,
-        audience: courseData.audience,
-        problem: courseData.problem,
-        purpose: courseData.purpose,
-        structure: courseData.structure,
+      // Verificar si el contexto de los expertos existe
+      if (!courseData.theoreticalContext || !courseData.practicalContext) {
+        alert(
+          "Por favor, genera primero la estructura del curso. Esto creará el contexto necesario para sugerir materiales relevantes.",
+        )
+        return
+      }
+
+      // Si el contexto existe, proceder con la generación de materiales
+      const materialsSuggestion = await generateMaterialSuggestions(courseData, {
+        theoreticalContext: courseData.theoreticalContext,
+        practicalContext: courseData.practicalContext,
       })
 
       updateCourseData({ materials: materialsSuggestion })

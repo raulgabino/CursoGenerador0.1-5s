@@ -126,7 +126,13 @@ export async function generateCourseStructure(
 /**
  * Generate AI-suggested materials and resources for a course
  */
-export async function generateMaterialSuggestions(courseData: Partial<CourseData>): Promise<string> {
+export async function generateMaterialSuggestions(
+  courseData: Partial<CourseData>,
+  context: {
+    theoreticalContext: string
+    practicalContext: string
+  },
+): Promise<string> {
   validateApiKey()
 
   if (!courseData || !courseData.title) {
@@ -137,29 +143,46 @@ export async function generateMaterialSuggestions(courseData: Partial<CourseData
     console.log("Generating material suggestions for:", courseData.title)
 
     const prompt = `
-Genera una lista de materiales y recursos recomendados para un curso titulado "${courseData.title}" 
-dirigido a "${courseData.audience || "estudiantes"}".
+Eres un diseñador instruccional experto especializado en crear materiales educativos que conecten efectivamente la teoría con la práctica. Tu misión es diseñar una lista de materiales y recursos altamente relevantes para un curso específico.
 
-Información del curso:
+**INFORMACIÓN DEL CURSO:**
+- Título: "${courseData.title}"
+- Audiencia: "${courseData.audience || "estudiantes"}"
 - Problema que resuelve: "${courseData.problem || "No especificado"}"
 - Propósito: "${courseData.purpose || "No especificado"}"
-- Estructura del curso: "${courseData.structure || "No especificada"}"
 
-IMPORTANTE: Basa tus sugerencias en la estructura del curso proporcionada. Si la estructura incluye módulos específicos, sugiere materiales relevantes para esos módulos particulares.
+**ESTRUCTURA DE MÓDULOS:**
+${courseData.structure || "No especificada"}
 
-Proporciona una lista de:
-- Materiales didácticos específicos para los módulos del curso (presentaciones, guías, etc.)
-- Recursos multimedia relevantes para los temas de la estructura (videos, podcasts, etc.)
-- Herramientas digitales útiles para los contenidos específicos del curso
-- Actividades prácticas recomendadas para cada área temática de la estructura
+**ANÁLISIS DEL EXPERTO TEÓRICO:**
+"""
+${context.theoreticalContext}
+"""
 
-Si la estructura del curso está definida, incluye sugerencias específicas para algunos de los módulos listados para hacer la lista más útil y menos genérica.
+**ANÁLISIS DEL EXPERTO PRÁCTICO:**
+"""
+${context.practicalContext}
+"""
+
+**TU TAREA:**
+Basándote en la SÍNTESIS de toda la información proporcionada (datos del curso, estructura de módulos, contexto teórico y contexto práctico), diseña una lista completa de materiales y recursos que:
+
+1. Conecten directamente la teoría académica con las aplicaciones prácticas
+2. Sean específicamente relevantes para los módulos listados en la estructura
+3. Faciliten la transición del conocimiento conceptual a la implementación real
+4. Incluyan diferentes tipos de recursos (didácticos, multimedia, herramientas, actividades)
+
+**REQUISITOS ESPECÍFICOS:**
+- Si la estructura tiene módulos definidos, sugiere 1-2 materiales específicos para al menos dos de esos módulos, mencionando explícitamente el módulo al que corresponden
+- Balancea materiales teóricos (que refuercen los conceptos académicos) con materiales prácticos (que faciliten la aplicación)
+- Considera las necesidades específicas de la audiencia: "${courseData.audience || "estudiantes"}"
 
 Formato la respuesta como una lista con viñetas (usando guiones), un material por línea.
 Ejemplo:
-- Presentaciones digitales para cada módulo
-- Guías de ejercicios prácticos para [módulo específico]
-- Videos tutoriales sobre [tema específico de la estructura]
+- Presentaciones digitales que integren teoría y casos prácticos para cada módulo
+- Guía de ejercicios prácticos específica para [Módulo X]: [descripción específica]
+- Videos tutoriales sobre [tema específico del Módulo Y]
+- Plantillas de trabajo para aplicar [concepto teórico específico]
 ...
 `
 
@@ -214,7 +237,13 @@ Ejemplo:
 /**
  * Generate AI-suggested evaluation method for a course
  */
-export async function generateEvaluationMethod(courseData: Partial<CourseData>): Promise<string> {
+export async function generateEvaluationMethod(
+  courseData: Partial<CourseData>,
+  context?: {
+    theoreticalContext: string
+    practicalContext: string
+  },
+): Promise<string> {
   validateApiKey()
 
   if (!courseData || !courseData.title) {
@@ -225,23 +254,55 @@ export async function generateEvaluationMethod(courseData: Partial<CourseData>):
     console.log("Generating evaluation method for:", courseData.title)
 
     const prompt = `
-    Genera un método de evaluación detallado para un curso titulado "${courseData.title}" 
-    dirigido a "${courseData.audience || "estudiantes"}".
-    
-    Información del curso:
-    - Problema que resuelve: "${courseData.problem || "No especificado"}"
-    - Propósito: "${courseData.purpose || "No especificado"}"
-    - Tipo de evaluación preferida: "${courseData.evaluationType || "mixta"}"
-    - Se otorgará certificado: ${courseData.certificate ? "Sí" : "No"}
-    
-    Proporciona un método de evaluación que:
-    - Sea coherente con los objetivos del curso
-    - Incluya criterios claros de evaluación
-    - Especifique cómo se medirá el aprendizaje
-    - Sea adecuado para el público objetivo
-    
-    La respuesta debe ser un párrafo detallado pero conciso (máximo 5 líneas).
-    `
+Eres un experto en evaluación educativa especializado en diseñar métodos de evaluación que midan efectivamente el logro de objetivos de aprendizaje. Tu misión es crear un método de evaluación coherente y práctico para un curso específico.
+
+**INFORMACIÓN COMPLETA DEL CURSO:**
+- Título: "${courseData.title}"
+- Audiencia: "${courseData.audience || "estudiantes"}"
+- Problema que resuelve: "${courseData.problem || "No especificado"}"
+- Propósito principal: "${courseData.purpose || "No especificado"}"
+- Experiencia previa requerida: "${courseData.experience || "No especificada"}"
+- Duración: "${courseData.duration || "No especificada"}"
+- Tipo de evaluación preferida: "${courseData.evaluationType || "mixta"}"
+- Se otorgará certificado: ${courseData.certificate ? "Sí" : "No"}
+
+**ESTRUCTURA DEL CURSO:**
+${courseData.structure || "No especificada"}
+
+**MATERIALES PROPUESTOS:**
+${courseData.materials || "No especificados"}
+
+${
+  context
+    ? `**CONTEXTO DEL EXPERTO TEÓRICO:**
+"""
+${context.theoreticalContext}
+"""
+
+**CONTEXTO DEL EXPERTO PRÁCTICO:**
+"""
+${context.practicalContext}
+"""`
+    : ""
+}
+
+**TU TAREA:**
+Diseña un método de evaluación detallado (párrafo de 3 a 5 líneas) que:
+
+1. **Mida directamente si el propósito del curso se cumplió**: "${courseData.purpose || "No especificado"}"
+2. **Sea coherente con la estructura de módulos** y los materiales propuestos
+3. **Sea práctica y aplicable** para la audiencia: "${courseData.audience || "estudiantes"}"
+4. **Respete el tipo de evaluación preferida**: "${courseData.evaluationType || "mixta"}"
+5. **Integre tanto aspectos teóricos como prácticos** del aprendizaje
+
+**REQUISITOS ESPECÍFICOS:**
+- El método debe demostrar que los participantes pueden resolver el problema identificado: "${courseData.problem || "No especificado"}"
+- Debe incluir criterios claros de evaluación
+- Debe especificar cómo se medirá el aprendizaje de manera concreta
+- Debe ser realista para implementar con la audiencia objetivo
+
+Proporciona un párrafo detallado pero conciso (3-5 líneas máximo) que describa el método de evaluación completo.
+`
 
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
@@ -249,7 +310,7 @@ export async function generateEvaluationMethod(courseData: Partial<CourseData>):
         {
           role: "system",
           content:
-            "Eres un experto en diseño instruccional y evaluación educativa. Tu tarea es crear métodos de evaluación efectivos y adecuados para cursos educativos.",
+            "Eres un experto en evaluación educativa y diseño instruccional. Tu tarea es crear métodos de evaluación efectivos, coherentes y prácticos que midan el logro real de objetivos de aprendizaje.",
         },
         {
           role: "user",
@@ -257,7 +318,7 @@ export async function generateEvaluationMethod(courseData: Partial<CourseData>):
         },
       ],
       temperature: 0.7,
-      max_tokens: 250,
+      max_tokens: 300,
     })
 
     console.log("OpenAI API response received for evaluation method")
@@ -285,11 +346,11 @@ export async function generateEvaluationMethod(courseData: Partial<CourseData>):
     let fallbackContent = ""
 
     if (evaluationType === "manual") {
-      fallbackContent = `La evaluación se realizará mediante un proyecto final donde los participantes aplicarán los conocimientos adquiridos en ${courseData.title || "el curso"}. El instructor evaluará el proyecto según una rúbrica que considera la comprensión de conceptos clave, aplicación práctica y creatividad. Se proporcionará retroalimentación personalizada a cada participante para reforzar su aprendizaje.`
+      fallbackContent = `La evaluación se realizará mediante un proyecto final donde los participantes aplicarán los conocimientos adquiridos en ${courseData.title || "el curso"} para resolver el problema "${courseData.problem || "identificado"}". El instructor evaluará el proyecto según una rúbrica que considera la comprensión de conceptos clave, aplicación práctica y creatividad en la solución propuesta. Se proporcionará retroalimentación personalizada a cada participante para reforzar su aprendizaje y verificar el cumplimiento del propósito: "${courseData.purpose || "objetivos del curso"}".`
     } else if (evaluationType === "automatica") {
-      fallbackContent = `La evaluación se realizará mediante cuestionarios automatizados al final de cada módulo y un examen final que abarca todos los contenidos de ${courseData.title || "el curso"}. Cada evaluación tendrá un peso específico en la calificación final, siendo necesario obtener al menos un 70% para aprobar. Los resultados se entregarán inmediatamente para permitir la autorreflexión.`
+      fallbackContent = `La evaluación se realizará mediante cuestionarios automatizados al final de cada módulo de la estructura propuesta y un examen final que abarca todos los contenidos de ${courseData.title || "el curso"}. Cada evaluación tendrá un peso específico en la calificación final, siendo necesario obtener al menos un 70% para demostrar que se cumplió el propósito: "${courseData.purpose || "objetivos del curso"}". Los resultados se entregarán inmediatamente para permitir la autorreflexión y verificar la capacidad de resolver "${courseData.problem || "el problema identificado"}".`
     } else {
-      fallbackContent = `La evaluación combinará métodos automatizados y manuales: cuestionarios de opción múltiple al finalizar cada módulo (40%), participación en foros de discusión (20%) y un proyecto final (40%) donde los participantes aplicarán lo aprendido en ${courseData.title || "el curso"}. Se proporcionará retroalimentación personalizada en el proyecto final y se requerirá un mínimo de 70% para aprobar.`
+      fallbackContent = `La evaluación combinará métodos automatizados y manuales: cuestionarios de opción múltiple al finalizar cada módulo de la estructura (40%), participación en foros de discusión (20%) y un proyecto final (40%) donde los participantes aplicarán lo aprendido en ${courseData.title || "el curso"} para resolver "${courseData.problem || "el problema identificado"}". Se proporcionará retroalimentación personalizada en el proyecto final y se requerirá un mínimo de 70% para demostrar el cumplimiento del propósito: "${courseData.purpose || "objetivos del curso"}".`
     }
 
     return fallbackContent
