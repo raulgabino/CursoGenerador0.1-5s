@@ -1,83 +1,44 @@
 "use server"
 
+import OpenAI from "openai"
 import { generateTextWithAI } from "@/services/unified-ai-service"
 import type { CourseData } from "@/types/course"
 
-/**
- * Generate AI-suggested structure for a course using unified AI service
- */
-export async function generateCourseStructure(
-  courseData: Partial<CourseData>,
-  context: {
-    theoreticalContext: string
-    practicalContext: string
-  },
-): Promise<string> {
-  if (!courseData || !courseData.title) {
-    throw new Error("Se requiere al menos el título del curso para generar una estructura")
+export async function generateCourseStructure(courseData: CourseData): Promise<string | { error: string }> {
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+
+  const { title, theoreticalContext, practicalContext } = courseData
+  if (!title) {
+    return { error: "Se requiere un título para generar la estructura del curso." }
   }
 
+  const prompt = `
+    Actúa como un diseñador instruccional experto. Tu tarea es diseñar una estructura de módulos detallada para un curso titulado "${title}".
+    
+    CONTEXTO PROPORCIONADO POR EXPERTOS:
+    - Contexto Teórico (de un catedrático): ${theoreticalContext || "No proporcionado. Basa tu estructura en conocimiento general sobre el tema."}
+    - Contexto Práctico (de un consultor de industria): ${practicalContext || "No proporcionado."}
+    
+    INSTRUCCIONES:
+    1. Sintetiza la información de AMBOS contextos para crear una estructura de curso lógica y coherente.
+    2. La estructura debe consistir en una lista de módulos o unidades principales.
+    3. Para cada módulo, proporciona un título claro y una breve descripción (1-2 frases) de sus contenidos.
+    4. El resultado debe ser una lista de módulos bien definida que cubra el tema de manera exhaustiva.
+    5. Devuelve la lista de módulos en formato Markdown, usando guiones (-) para cada módulo.
+  `
+
   try {
-    console.log("Generating course structure for:", courseData.title)
-
-    // Prompt mejorado que sintetiza ambos contextos
-    const systemPrompt = `Eres un diseñador instruccional de élite, experto en crear planes de estudio coherentes. Tu misión es sintetizar las perspectivas de dos expertos para diseñar la estructura de un curso.`
-
-    const prompt = `
-    **Información del Curso:**
-    - Título: ${courseData.title}
-    - Audiencia: ${courseData.audience || "estudiantes"}
-    - Problema que resuelve: ${courseData.problem || "No especificado"}
-    - Propósito: ${courseData.purpose || "No especificado"}
-    - Experiencia previa requerida: ${courseData.experience || "No especificada"}
-    - Duración: ${courseData.duration || "un curso estándar"}
-
-    **Contexto del Experto Teórico (Análisis Académico):**
-    """
-    ${context.theoreticalContext}
-    """
-
-    **Contexto del Experto Práctico (Análisis de Aplicaciones):**
-    """
-    ${context.practicalContext}
-    """
-
-    **Tu Tarea:**
-    Basado en la SÍNTESIS de AMBOS análisis de expertos, crea una estructura de curso de 4 a 8 módulos. La estructura debe fluir lógicamente desde los fundamentos teóricos hacia las aplicaciones prácticas. Asegúrate de que cada módulo conecte la teoría con la práctica.
-
-    Proporciona una estructura de curso con:
-    - Entre 4 y 8 módulos numerados
-    - Cada módulo debe tener un título claro y descriptivo
-    - Los módulos deben seguir una progresión lógica que integre teoría y práctica
-    - La estructura debe ser adecuada para ${courseData.duration || "un curso estándar"}
-
-    Formato la respuesta como una lista numerada simple, un módulo por línea.
-    Ejemplo:
-    1. Introducción a [tema]
-    2. Fundamentos de [concepto clave]
-    ...
-    `
-
-    // Usar el servicio unificado con preferencia por OpenAI para estructuración
-    const result = await generateTextWithAI(prompt, systemPrompt, {
-      provider: "openai", // Preferir OpenAI para estructuración de cursos
-      fallbackProviders: ["cohere", "anthropic", "google"],
-      maxTokens: 1500,
-      temperature: 0.7,
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{ role: "system", content: prompt }],
+      temperature: 0.5,
+      max_tokens: 1000, // <-- ESTE ES EL VALOR CORREGIDO
     })
 
-    console.log(`Estructura del curso generada con ${result.provider}`)
-    return result.text
-  } catch (error: any) {
-    console.error("Error al generar estructura del curso:", error)
-
-    // Provide fallback content in case of error
-    return `1. Introducción a ${courseData.title || "la materia"}
-2. Fundamentos teóricos y conceptos clave
-3. Aplicaciones prácticas y casos de estudio
-4. Herramientas y técnicas avanzadas
-5. Evaluación y retroalimentación
-6. Proyecto final y cierre del curso`
+    return response.choices[0].message.content || "No se pudieron generar sugerencias."
+  } catch (error) {
+    console.error("Error generating course structure:", error)
+    return { error: "No se pudo contactar al servicio de IA para generar la estructura del curso." }
   }
 }
 
@@ -161,93 +122,41 @@ Formato la respuesta como una lista con viñetas (usando guiones), un material p
   }
 }
 
-/**
- * Generate AI-suggested evaluation method for a course using unified AI service
- */
-export async function generateEvaluationMethod(
-  courseData: Partial<CourseData>,
-  context?: {
-    theoreticalContext: string
-    practicalContext: string
-  },
-): Promise<string> {
-  if (!courseData || !courseData.title) {
-    throw new Error("Se requiere al menos el título del curso para generar un método de evaluación")
+export async function generateEvaluationMethod(courseData: CourseData): Promise<string | { error: string }> {
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+
+  const { title, theoreticalContext, practicalContext, structure } = courseData
+  if (!title || !structure) {
+    return { error: "Se requiere el título y la estructura del curso para generar métodos de evaluación." }
   }
 
+  const prompt = `
+    Actúa como un diseñador instruccional experto especializado en evaluación educativa.
+    Tu tarea es diseñar métodos de evaluación para un curso titulado "${title}".
+    
+    CONTEXTO DEL CURSO:
+    - Contexto Teórico: ${theoreticalContext || "No proporcionado."}
+    - Contexto Práctico: ${practicalContext || "No proporcionado."}
+    - Estructura del Curso: ${JSON.stringify(structure, null, 2)}
+    
+    Basándote en TODA la información anterior, genera una lista de métodos de evaluación variados y efectivos.
+    Incluye una mezcla de evaluación formativa (para medir el progreso durante el curso) y sumativa (para medir el resultado final).
+    Para cada método, describe brevemente cómo se implementaría y qué objetivo de aprendizaje específico evalúa.
+    
+    La salida debe ser en formato Markdown.
+  `
+
   try {
-    console.log("Generating evaluation method for:", courseData.title)
-
-    const systemPrompt = `Eres un experto en evaluación educativa especializado en diseñar métodos de evaluación que midan efectivamente el logro de objetivos de aprendizaje. Tu misión es crear un método de evaluación coherente y práctico para un curso específico.`
-
-    const prompt = `
-**INFORMACIÓN COMPLETA DEL CURSO:**
-- Título: "${courseData.title}"
-- Audiencia: "${courseData.audience || "estudiantes"}"
-- Problema que resuelve: "${courseData.problem || "No especificado"}"
-- Propósito principal: "${courseData.purpose || "No especificado"}"
-- Experiencia previa requerida: "${courseData.experience || "No especificada"}"
-- Duración: "${courseData.duration || "No especificada"}"
-- Tipo de evaluación preferida: "${courseData.evaluationType || "mixta"}"
-- Se otorgará certificado: ${courseData.certificate ? "Sí" : "No"}
-
-**ESTRUCTURA DEL CURSO:**
-${courseData.structure || "No especificada"}
-
-**MATERIALES PROPUESTOS:**
-${courseData.materials || "No especificados"}
-
-${
-  context
-    ? `**CONTEXTO DEL EXPERTO TEÓRICO:**
-"""
-${context.theoreticalContext}
-"""
-
-**CONTEXTO DEL EXPERTO PRÁCTICO:**
-"""
-${context.practicalContext}
-"""`
-    : ""
-}
-
-**TU TAREA:**
-Diseña un método de evaluación detallado (párrafo de 3 a 5 líneas) que:
-
-1. **Mida directamente si el propósito del curso se cumplió**: "${courseData.purpose || "No especificado"}"
-2. **Sea coherente con la estructura de módulos** y los materiales propuestos
-3. **Sea práctica y aplicable** para la audiencia: "${courseData.audience || "estudiantes"}"
-4. **Respete el tipo de evaluación preferida**: "${courseData.evaluationType || "mixta"}"
-5. **Integre tanto aspectos teóricos como prácticos** del aprendizaje
-
-Proporciona un párrafo detallado pero conciso (3-5 líneas máximo) que describa el método de evaluación completo.
-`
-
-    // Usar el servicio unificado con preferencia por Anthropic para evaluación educativa
-    const result = await generateTextWithAI(prompt, systemPrompt, {
-      provider: "anthropic", // Preferir Claude para evaluación educativa
-      fallbackProviders: ["openai", "cohere", "google"],
-      maxTokens: 300,
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{ role: "system", content: prompt }],
       temperature: 0.7,
+      max_tokens: 800, // <-- ESTE ES EL VALOR CORREGIDO
     })
 
-    console.log(`Método de evaluación generado con ${result.provider}`)
-    return result.text
-  } catch (error: any) {
-    console.error("Error al generar método de evaluación:", error)
-
-    // Provide fallback content in case of error
-    const evaluationType = courseData.evaluationType || "mixta"
-    let fallbackContent = ""
-
-    if (evaluationType === "manual") {
-      fallbackContent = `La evaluación se realizará mediante un proyecto final donde los participantes aplicarán los conocimientos adquiridos en ${courseData.title || "el curso"} para resolver el problema "${courseData.problem || "identificado"}". El instructor evaluará el proyecto según una rúbrica que considera la comprensión de conceptos clave, aplicación práctica y creatividad en la solución propuesta. Se proporcionará retroalimentación personalizada a cada participante para reforzar su aprendizaje y verificar el cumplimiento del propósito: "${courseData.purpose || "objetivos del curso"}".`
-    } else if (evaluationType === "automatica") {
-      fallbackContent = `La evaluación se realizará mediante cuestionarios automatizados al final de cada módulo de la estructura propuesta y un examen final que abarca todos los contenidos de ${courseData.title || "el curso"}. Cada evaluación tendrá un peso específico en la calificación final, siendo necesario obtener al menos un 70% para demostrar que se cumplió el propósito: "${courseData.purpose || "objetivos del curso"}". Los resultados se entregarán inmediatamente para permitir la autorreflexión y verificar la capacidad de resolver "${courseData.problem || "el problema identificado"}".`
-    } else {
-      fallbackContent = `La evaluación combinará métodos automatizados y manuales: cuestionarios de opción múltiple al finalizar cada módulo de la estructura (40%), participación en foros de discusión (20%) y un proyecto final (40%) donde los participantes aplicarán lo aprendido en ${courseData.title || "el curso"} para resolver "${courseData.problem || "el problema identificado"}". Se proporcionará retroalimentación personalizada en el proyecto final y se requerirá un mínimo de 70% para demostrar el cumplimiento del propósito: "${courseData.purpose || "objetivos del curso"}".`
-    }
-
-    return fallbackContent
+    return response.choices[0].message.content || "No se pudieron generar sugerencias."
+  } catch (error) {
+    console.error("Error generating evaluation methods:", error)
+    return { error: "No se pudo contactar al servicio de IA para generar sugerencias de evaluación." }
   }
 }
