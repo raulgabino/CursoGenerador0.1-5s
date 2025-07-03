@@ -36,7 +36,7 @@ export async function runAIDiagnostics(): Promise<DiagnosticResult> {
   }
 
   // Evaluar cada proveedor
-  const providers = ["openai", "anthropic", "google", "grok"] as const
+  const providers = ["openai", "cohere", "anthropic", "google", "grok"] as const
   let healthyProviders = 0
 
   for (const provider of providers) {
@@ -80,6 +80,11 @@ export async function runAIDiagnostics(): Promise<DiagnosticResult> {
 
   if (healthyProviders >= 2) {
     result.recommendations.push("Considerar configurar un orden de preferencia para los proveedores de IA")
+  }
+
+  // Recomendación específica para Cohere
+  if (validation.availableProviders.cohere) {
+    result.recommendations.push("Cohere está disponible como alternativa rápida y eficiente para generación de texto")
   }
 
   return result

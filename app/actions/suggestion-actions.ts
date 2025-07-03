@@ -1,24 +1,10 @@
 "use server"
 
-import OpenAI from "openai"
+import { generateTextWithAI } from "@/services/unified-ai-service"
 import type { CourseData } from "@/types/course"
-// import { generateExpertContext } from "@/services/context-service"
-
-// Initialize OpenAI client (server-side only)
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || "",
-})
-
-// Add a validation check at the beginning of each function
-function validateApiKey() {
-  if (!process.env.OPENAI_API_KEY) {
-    console.error("OpenAI API key is missing")
-    throw new Error("API key configuration error. Please check server configuration.")
-  }
-}
 
 /**
- * Generate AI-suggested structure for a course
+ * Generate AI-suggested structure for a course using unified AI service
  */
 export async function generateCourseStructure(
   courseData: Partial<CourseData>,
@@ -27,8 +13,6 @@ export async function generateCourseStructure(
     practicalContext: string
   },
 ): Promise<string> {
-  validateApiKey()
-
   if (!courseData || !courseData.title) {
     throw new Error("Se requiere al menos el título del curso para generar una estructura")
   }
@@ -36,13 +20,10 @@ export async function generateCourseStructure(
   try {
     console.log("Generating course structure for:", courseData.title)
 
-    // Obtener contexto enriquecido del panel de expertos
-    // const { theoreticalContext, practicalContext } = await generateExpertContext(courseData.title)
-
     // Prompt mejorado que sintetiza ambos contextos
-    const finalPrompt = `
-    Eres un diseñador instruccional de élite, experto en crear planes de estudio coherentes. Tu misión es sintetizar las perspectivas de dos expertos para diseñar la estructura de un curso.
+    const systemPrompt = `Eres un diseñador instruccional de élite, experto en crear planes de estudio coherentes. Tu misión es sintetizar las perspectivas de dos expertos para diseñar la estructura de un curso.`
 
+    const prompt = `
     **Información del Curso:**
     - Título: ${courseData.title}
     - Audiencia: ${courseData.audience || "estudiantes"}
@@ -77,41 +58,18 @@ export async function generateCourseStructure(
     ...
     `
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content:
-            "Eres un experto en diseño instruccional y educación. Tu tarea es crear estructuras de cursos efectivas y bien organizadas que integren perspectivas teóricas y prácticas.",
-        },
-        {
-          role: "user",
-          content: finalPrompt,
-        },
-      ],
+    // Usar el servicio unificado con preferencia por OpenAI para estructuración
+    const result = await generateTextWithAI(prompt, systemPrompt, {
+      provider: "openai", // Preferir OpenAI para estructuración de cursos
+      fallbackProviders: ["cohere", "anthropic", "google"],
+      maxTokens: 1500,
       temperature: 0.7,
     })
 
-    console.log("OpenAI API response received for enhanced course structure")
-    const content = response.choices[0]?.message?.content || ""
-
-    if (!content || content.trim() === "") {
-      console.error("Empty response from OpenAI API")
-      throw new Error("La respuesta de la API está vacía")
-    }
-
-    return content
+    console.log(`Estructura del curso generada con ${result.provider}`)
+    return result.text
   } catch (error: any) {
     console.error("Error al generar estructura del curso:", error)
-
-    // Log more detailed error information
-    if (error.response) {
-      console.error("OpenAI API error response:", {
-        status: error.response.status,
-        data: error.response.data,
-      })
-    }
 
     // Provide fallback content in case of error
     return `1. Introducción a ${courseData.title || "la materia"}
@@ -124,7 +82,7 @@ export async function generateCourseStructure(
 }
 
 /**
- * Generate AI-suggested materials and resources for a course
+ * Generate AI-suggested materials and resources for a course using unified AI service
  */
 export async function generateMaterialSuggestions(
   courseData: Partial<CourseData>,
@@ -133,8 +91,6 @@ export async function generateMaterialSuggestions(
     practicalContext: string
   },
 ): Promise<string> {
-  validateApiKey()
-
   if (!courseData || !courseData.title) {
     throw new Error("Se requiere al menos el título del curso para generar sugerencias de materiales")
   }
@@ -142,9 +98,9 @@ export async function generateMaterialSuggestions(
   try {
     console.log("Generating material suggestions for:", courseData.title)
 
-    const prompt = `
-Eres un diseñador instruccional experto especializado en crear materiales educativos que conecten efectivamente la teoría con la práctica. Tu misión es diseñar una lista de materiales y recursos altamente relevantes para un curso específico.
+    const systemPrompt = `Eres un diseñador instruccional experto especializado en crear materiales educativos que conecten efectivamente la teoría con la práctica. Tu misión es diseñar una lista de materiales y recursos altamente relevantes para un curso específico.`
 
+    const prompt = `
 **INFORMACIÓN DEL CURSO:**
 - Título: "${courseData.title}"
 - Audiencia: "${courseData.audience || "estudiantes"}"
@@ -165,7 +121,7 @@ ${context.practicalContext}
 """
 
 **TU TAREA:**
-Basándote en la SÍNTESIS de toda la información proporcionada (datos del curso, estructura de módulos, contexto teórico y contexto práctico), diseña una lista completa de materiales y recursos que:
+Basándote en la SÍNTESIS de toda la información proporcionada, diseña una lista completa de materiales y recursos que:
 
 1. Conecten directamente la teoría académica con las aplicaciones prácticas
 2. Sean específicamente relevantes para los módulos listados en la estructura
@@ -173,54 +129,25 @@ Basándote en la SÍNTESIS de toda la información proporcionada (datos del curs
 4. Incluyan diferentes tipos de recursos (didácticos, multimedia, herramientas, actividades)
 
 **REQUISITOS ESPECÍFICOS:**
-- Si la estructura tiene módulos definidos, sugiere 1-2 materiales específicos para al menos dos de esos módulos, mencionando explícitamente el módulo al que corresponden
-- Balancea materiales teóricos (que refuercen los conceptos académicos) con materiales prácticos (que faciliten la aplicación)
+- Si la estructura tiene módulos definidos, sugiere 1-2 materiales específicos para al menos dos de esos módulos
+- Balancea materiales teóricos con materiales prácticos
 - Considera las necesidades específicas de la audiencia: "${courseData.audience || "estudiantes"}"
 
 Formato la respuesta como una lista con viñetas (usando guiones), un material por línea.
-Ejemplo:
-- Presentaciones digitales que integren teoría y casos prácticos para cada módulo
-- Guía de ejercicios prácticos específica para [Módulo X]: [descripción específica]
-- Videos tutoriales sobre [tema específico del Módulo Y]
-- Plantillas de trabajo para aplicar [concepto teórico específico]
-...
 `
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content:
-            "Eres un experto en diseño instruccional y educación. Tu tarea es recomendar materiales y recursos efectivos para cursos educativos.",
-        },
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
+    // Usar el servicio unificado con preferencia por Cohere para sugerencias de materiales
+    const result = await generateTextWithAI(prompt, systemPrompt, {
+      provider: "cohere", // Preferir Cohere para sugerencias creativas
+      fallbackProviders: ["openai", "anthropic", "google"],
+      maxTokens: 1500,
       temperature: 0.7,
     })
 
-    console.log("OpenAI API response received for material suggestions")
-    const content = response.choices[0]?.message?.content || ""
-
-    if (!content || content.trim() === "") {
-      console.error("Empty response from OpenAI API")
-      throw new Error("La respuesta de la API está vacía")
-    }
-
-    return content
+    console.log(`Sugerencias de materiales generadas con ${result.provider}`)
+    return result.text
   } catch (error: any) {
     console.error("Error al generar sugerencias de materiales:", error)
-
-    // Log more detailed error information
-    if (error.response) {
-      console.error("OpenAI API error response:", {
-        status: error.response.status,
-        data: error.response.data,
-      })
-    }
 
     // Provide fallback content in case of error
     return `- Presentaciones digitales para cada módulo
@@ -235,7 +162,7 @@ Ejemplo:
 }
 
 /**
- * Generate AI-suggested evaluation method for a course
+ * Generate AI-suggested evaluation method for a course using unified AI service
  */
 export async function generateEvaluationMethod(
   courseData: Partial<CourseData>,
@@ -244,8 +171,6 @@ export async function generateEvaluationMethod(
     practicalContext: string
   },
 ): Promise<string> {
-  validateApiKey()
-
   if (!courseData || !courseData.title) {
     throw new Error("Se requiere al menos el título del curso para generar un método de evaluación")
   }
@@ -253,9 +178,9 @@ export async function generateEvaluationMethod(
   try {
     console.log("Generating evaluation method for:", courseData.title)
 
-    const prompt = `
-Eres un experto en evaluación educativa especializado en diseñar métodos de evaluación que midan efectivamente el logro de objetivos de aprendizaje. Tu misión es crear un método de evaluación coherente y práctico para un curso específico.
+    const systemPrompt = `Eres un experto en evaluación educativa especializado en diseñar métodos de evaluación que midan efectivamente el logro de objetivos de aprendizaje. Tu misión es crear un método de evaluación coherente y práctico para un curso específico.`
 
+    const prompt = `
 **INFORMACIÓN COMPLETA DEL CURSO:**
 - Título: "${courseData.title}"
 - Audiencia: "${courseData.audience || "estudiantes"}"
@@ -295,51 +220,21 @@ Diseña un método de evaluación detallado (párrafo de 3 a 5 líneas) que:
 4. **Respete el tipo de evaluación preferida**: "${courseData.evaluationType || "mixta"}"
 5. **Integre tanto aspectos teóricos como prácticos** del aprendizaje
 
-**REQUISITOS ESPECÍFICOS:**
-- El método debe demostrar que los participantes pueden resolver el problema identificado: "${courseData.problem || "No especificado"}"
-- Debe incluir criterios claros de evaluación
-- Debe especificar cómo se medirá el aprendizaje de manera concreta
-- Debe ser realista para implementar con la audiencia objetivo
-
 Proporciona un párrafo detallado pero conciso (3-5 líneas máximo) que describa el método de evaluación completo.
 `
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content:
-            "Eres un experto en evaluación educativa y diseño instruccional. Tu tarea es crear métodos de evaluación efectivos, coherentes y prácticos que midan el logro real de objetivos de aprendizaje.",
-        },
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
+    // Usar el servicio unificado con preferencia por Anthropic para evaluación educativa
+    const result = await generateTextWithAI(prompt, systemPrompt, {
+      provider: "anthropic", // Preferir Claude para evaluación educativa
+      fallbackProviders: ["openai", "cohere", "google"],
+      maxTokens: 300,
       temperature: 0.7,
-      max_tokens: 300,
     })
 
-    console.log("OpenAI API response received for evaluation method")
-    const content = response.choices[0]?.message?.content || ""
-
-    if (!content || content.trim() === "") {
-      console.error("Empty response from OpenAI API")
-      throw new Error("La respuesta de la API está vacía")
-    }
-
-    return content
+    console.log(`Método de evaluación generado con ${result.provider}`)
+    return result.text
   } catch (error: any) {
     console.error("Error al generar método de evaluación:", error)
-
-    // Log more detailed error information
-    if (error.response) {
-      console.error("OpenAI API error response:", {
-        status: error.response.status,
-        data: error.response.data,
-      })
-    }
 
     // Provide fallback content in case of error
     const evaluationType = courseData.evaluationType || "mixta"

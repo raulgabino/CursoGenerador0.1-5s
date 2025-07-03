@@ -122,25 +122,35 @@ export default function Home() {
 
           <div className="text-center space-y-4">
             <Button
-              className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-2 rounded-full text-lg transition-all duration-300 transform hover:scale-105"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 text-lg"
               onClick={handleStartNewCourse}
             >
-              ¡Comenzar nuevo curso!
+              Crear nuevo curso
             </Button>
 
             {hasSavedData && (
-              <div className="mt-4">
-                <p className="text-sm text-gray-600 mb-2">¿Tienes un curso en progreso?</p>
+              <div>
+                <p className="text-gray-600 mb-2">¿Tienes un curso en progreso?</p>
                 <Button
                   variant="outline"
+                  className="border-blue-600 text-blue-600 hover:bg-blue-50 bg-transparent"
                   onClick={handleContinueCourse}
-                  className="border-blue-300 text-blue-600 hover:bg-blue-50"
                 >
                   Continuar curso guardado
                 </Button>
               </div>
             )}
           </div>
+        </div>
+
+        <div className="bg-blue-50 rounded-lg p-6 text-center">
+          <h3 className="font-bold text-lg text-blue-700 mb-2">¿Necesitas ayuda?</h3>
+          <p className="text-gray-700 mb-4">
+            Whorkshop está diseñado para ser intuitivo, pero si tienes preguntas, estamos aquí para ayudarte.
+          </p>
+          <Button variant="outline" className="border-blue-600 text-blue-600 hover:bg-blue-100 bg-transparent">
+            Ver guía de uso
+          </Button>
         </div>
       </div>
     </main>

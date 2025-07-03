@@ -2,6 +2,7 @@
 
 import { generateTextWithClaude, isAnthropicAvailable } from "./anthropic-service"
 import { generateTextWithGemini, isGeminiAvailable } from "./gemini-service"
+import { generateTextWithCohere, isCohereAvailable, generateChatWithCohere } from "./cohere-service"
 import { AI_CONFIG, type AIProvider, getPreferredProvider } from "@/lib/ai-config"
 import OpenAI from "openai"
 
@@ -86,7 +87,7 @@ export async function generateTextWithAI(
   success: boolean
 }> {
   const preferredProvider = options?.provider || (await getPreferredProvider())
-  const fallbackProviders = options?.fallbackProviders || ["openai", "anthropic", "google"]
+  const fallbackProviders = options?.fallbackProviders || ["openai", "cohere", "anthropic", "google"]
 
   // Lista de proveedores a intentar
   const providersToTry: AIProvider[] = []
@@ -114,6 +115,22 @@ export async function generateTextWithAI(
         case "openai":
           if (!AI_CONFIG.openai.apiKey) continue
           text = await generateTextWithOpenAI(prompt, systemPrompt, options)
+          break
+
+        case "cohere":
+          if (!(await isCohereAvailable())) continue
+          // Usar chat si hay system prompt, generate si no
+          if (systemPrompt) {
+            text = await generateChatWithCohere(
+              [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: prompt },
+              ],
+              options,
+            )
+          } else {
+            text = await generateTextWithCohere(prompt, systemPrompt, options)
+          }
           break
 
         case "anthropic":
@@ -154,6 +171,10 @@ export async function getAIProvidersStatus() {
       available: !!AI_CONFIG.openai.apiKey,
       model: AI_CONFIG.openai.model,
     },
+    cohere: {
+      available: await isCohereAvailable(),
+      model: AI_CONFIG.cohere.model,
+    },
     anthropic: {
       available: await isAnthropicAvailable(),
       model: AI_CONFIG.anthropic.model,
@@ -167,4 +188,62 @@ export async function getAIProvidersStatus() {
       model: AI_CONFIG.grok.model,
     },
   }
+}
+
+// Función para generar texto con múltiples proveedores en paralelo (para comparación)
+export async function generateTextWithMultipleProviders(
+  prompt: string,
+  systemPrompt?: string,
+  providers: AIProvider[] = ["openai", "cohere", "anthropic"],
+  options?: {
+    model?: string
+    maxTokens?: number
+    temperature?: number
+  },
+): Promise<
+  Array<{
+    provider: AIProvider
+    text: string | null
+    error: string | null
+    duration: number
+  }>
+> {
+  const results = await Promise.allSettled(
+    providers.map(async (provider) => {
+      const startTime = Date.now()
+      try {
+        const result = await generateTextWithAI(prompt, systemPrompt, {
+          ...options,
+          provider,
+          fallbackProviders: [], // No usar fallbacks en comparación
+        })
+        return {
+          provider,
+          text: result.text,
+          error: null,
+          duration: Date.now() - startTime,
+        }
+      } catch (error: any) {
+        return {
+          provider,
+          text: null,
+          error: error.message,
+          duration: Date.now() - startTime,
+        }
+      }
+    }),
+  )
+
+  return results.map((result, index) => {
+    if (result.status === "fulfilled") {
+      return result.value
+    } else {
+      return {
+        provider: providers[index],
+        text: null,
+        error: result.reason?.message || "Error desconocido",
+        duration: 0,
+      }
+    }
+  })
 }

@@ -6,10 +6,11 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { motion } from "framer-motion"
-import { Loader2, Sparkles } from "lucide-react"
+import { Loader2, Sparkles, BookOpen } from "lucide-react"
 import type { CourseData } from "@/types/course"
 import { generateCourseStructure, generateMaterialSuggestions } from "@/app/actions/suggestion-actions"
 import { getExpertContextForCourse } from "@/app/actions/context-actions"
+import { getAndSummarizeSources } from "@/app/actions/source-actions"
 
 interface ContentScreenProps {
   courseData: CourseData
@@ -23,6 +24,8 @@ export default function ContentScreen({ courseData, updateCourseData, onNext, on
   const [isGeneratingStructure, setIsGeneratingStructure] = useState(false)
   const [isGeneratingMaterials, setIsGeneratingMaterials] = useState(false)
   const [aiError, setAiError] = useState<string | null>(null)
+  const [loadingSources, setLoadingSources] = useState<Record<number, boolean>>({})
+  const [sourceResults, setSourceResults] = useState<Record<number, string>>({})
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
@@ -103,6 +106,18 @@ export default function ContentScreen({ courseData, updateCourseData, onNext, on
     }
   }
 
+  const handleFindSources = async (moduleIndex: number, topic: string) => {
+    setLoadingSources((prev) => ({ ...prev, [moduleIndex]: true }))
+    setSourceResults((prev) => ({ ...prev, [moduleIndex]: "" })) // Clear previous results
+    const result = await getAndSummarizeSources(topic)
+    if (typeof result === "object" && result.error) {
+      setSourceResults((prev) => ({ ...prev, [moduleIndex]: `Error: ${result.error}` }))
+    } else if (typeof result === "string") {
+      setSourceResults((prev) => ({ ...prev, [moduleIndex]: result }))
+    }
+    setLoadingSources((prev) => ({ ...prev, [moduleIndex]: false }))
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, x: 100 }}
@@ -161,6 +176,44 @@ export default function ContentScreen({ courseData, updateCourseData, onNext, on
             className={errors.structure ? "border-red-500" : ""}
           />
           {errors.structure && <p className="text-red-500 text-sm mt-1">{errors.structure}</p>}
+          {/* Mostrar módulos individuales si hay estructura */}
+          {courseData.structure && (
+            <div className="mt-4 space-y-4">
+              <h4 className="font-medium text-blue-800">Módulos del curso:</h4>
+              {courseData.structure
+                .split("\n")
+                .filter((line) => line.trim())
+                .map((module, index) => (
+                  <div key={index} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                    <h5 className="font-medium text-gray-800 mb-2">{module}</h5>
+                    <div className="mt-4">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleFindSources(index, module)}
+                        disabled={loadingSources[index]}
+                      >
+                        {loadingSources[index] ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <BookOpen className="mr-2 h-4 w-4" />
+                        )}
+                        Buscar Fuentes Académicas
+                      </Button>
+                      {sourceResults[index] && (
+                        <div className="mt-4 rounded-md border bg-gray-50 p-4 text-sm">
+                          <h4 className="font-semibold mb-2 text-gray-800">Fuentes Sugeridas:</h4>
+                          <div
+                            className="prose prose-sm max-w-none"
+                            dangerouslySetInnerHTML={{ __html: sourceResults[index].replace(/\n/g, "<br />") }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+            </div>
+          )}
         </div>
 
         <div>
