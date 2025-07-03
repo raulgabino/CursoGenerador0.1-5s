@@ -107,14 +107,17 @@ export default function ContentScreen({ courseData, updateCourseData, onNext, on
   }
 
   const handleFindSources = async (moduleIndex: number, topic: string) => {
+    // Activar el estado de carga para este módulo específico
     setLoadingSources((prev) => ({ ...prev, [moduleIndex]: true }))
-    setSourceResults((prev) => ({ ...prev, [moduleIndex]: "" })) // Clear previous results
+    // Limpiar resultados anteriores para este módulo
+    setSourceResults((prev) => ({ ...prev, [moduleIndex]: "" }))
     const result = await getAndSummarizeSources(topic)
     if (typeof result === "object" && result.error) {
       setSourceResults((prev) => ({ ...prev, [moduleIndex]: `Error: ${result.error}` }))
     } else if (typeof result === "string") {
       setSourceResults((prev) => ({ ...prev, [moduleIndex]: result }))
     }
+    // Desactivar el estado de carga para este módulo
     setLoadingSources((prev) => ({ ...prev, [moduleIndex]: false }))
   }
 
@@ -176,6 +179,7 @@ export default function ContentScreen({ courseData, updateCourseData, onNext, on
             className={errors.structure ? "border-red-500" : ""}
           />
           {errors.structure && <p className="text-red-500 text-sm mt-1">{errors.structure}</p>}
+
           {/* Mostrar módulos individuales si hay estructura */}
           {courseData.structure && (
             <div className="mt-4 space-y-4">
@@ -186,23 +190,27 @@ export default function ContentScreen({ courseData, updateCourseData, onNext, on
                 .map((module, index) => (
                   <div key={index} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
                     <h5 className="font-medium text-gray-800 mb-2">{module}</h5>
-                    <div className="mt-4">
+
+                    <div className="mt-4 pt-4 border-t border-gray-200">
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => handleFindSources(index, module)}
                         disabled={loadingSources[index]}
+                        className="transition-all duration-150"
                       >
                         {loadingSources[index] ? (
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         ) : (
                           <BookOpen className="mr-2 h-4 w-4" />
                         )}
-                        Buscar Fuentes Académicas
+                        Buscar Fuentes para este Módulo
                       </Button>
+
+                      {/* Muestra los resultados solo para el módulo actual */}
                       {sourceResults[index] && (
                         <div className="mt-4 rounded-md border bg-gray-50 p-4 text-sm">
-                          <h4 className="font-semibold mb-2 text-gray-800">Fuentes Sugeridas:</h4>
+                          <h4 className="font-semibold mb-2 text-gray-800">Fuentes Académicas Sugeridas:</h4>
                           <div
                             className="prose prose-sm max-w-none"
                             dangerouslySetInnerHTML={{ __html: sourceResults[index].replace(/\n/g, "<br />") }}

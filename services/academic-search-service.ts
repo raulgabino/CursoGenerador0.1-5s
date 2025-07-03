@@ -1,6 +1,6 @@
 "use server"
 
-// Define una estructura unificada para los resultados de ambas APIs
+// services/academic-search-service.ts
 export interface AcademicSource {
   title: string
   authors: string[]
@@ -10,7 +10,19 @@ export interface AcademicSource {
   source: "CORE" | "arXiv"
 }
 
-// Función para buscar en la API de CORE
+// Función de fetch con timeout para abortar peticiones largas
+async function fetchWithTimeout(url: string, options: RequestInit, timeout = 8000): Promise<Response> {
+  const controller = new AbortController()
+  const id = setTimeout(() => controller.abort(), timeout)
+  const response = await fetch(url, {
+    ...options,
+    signal: controller.signal,
+  })
+  clearTimeout(id)
+  return response
+}
+
+// Búsqueda en CORE, ahora con timeout y logging
 async function searchCore(query: string): Promise<AcademicSource[]> {
   const CORE_API_KEY = process.env.CORE_API_KEY
   if (!CORE_API_KEY) {
@@ -18,25 +30,28 @@ async function searchCore(query: string): Promise<AcademicSource[]> {
     return []
   }
 
+  console.log(`[AcademicSearch] Iniciando búsqueda en CORE para: "${query}"`)
   try {
-    const response = await fetch("https://api.core.ac.uk/v3/search/works", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${CORE_API_KEY}`,
+    const response = await fetchWithTimeout(
+      "https://api.core.ac.uk/v3/search/works",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${CORE_API_KEY}`,
+        },
+        body: JSON.stringify({ q: query, limit: 5 }),
       },
-      body: JSON.stringify({
-        q: query,
-        limit: 5, // Pedimos 5 para tener opciones
-      }),
-    })
+      7000,
+    ) // Timeout estricto de 7 segundos
 
     if (!response.ok) {
-      console.error(`CORE API error: ${response.statusText}`)
+      console.error(`[AcademicSearch] CORE API error: ${response.status} ${response.statusText}`)
       return []
     }
 
     const data = await response.json()
+    console.log(`[AcademicSearch] Búsqueda en CORE completada.`)
     return data.results.map(
       (item: any): AcademicSource => ({
         title: item.title,
@@ -47,27 +62,28 @@ async function searchCore(query: string): Promise<AcademicSource[]> {
         source: "CORE",
       }),
     )
-  } catch (error) {
-    console.error("Failed to fetch from CORE API:", error)
+  } catch (error: any) {
+    if (error.name === "AbortError") {
+      console.error("[AcademicSearch] La petición a CORE ha excedido el tiempo de espera.")
+    } else {
+      console.error("[AcademicSearch] Fallo al contactar la API de CORE:", error)
+    }
     return []
   }
 }
 
-// Función para buscar en la API de arXiv
+// Búsqueda en arXiv, ahora con timeout y logging
 async function searchArxiv(query: string): Promise<AcademicSource[]> {
+  console.log(`[AcademicSearch] Iniciando búsqueda en arXiv para: "${query}"`)
   try {
-    // arXiv usa 'ti' para título y 'abs' para resumen en su query
     const searchQuery = `ti:"${query}" OR abs:"${query}"`
-    const url = `http://export.arxiv.org/api/query?search_query=${encodeURIComponent(
-      searchQuery,
-    )}&sortBy=relevance&sortOrder=descending&max_results=5`
-
-    const response = await fetch(url)
+    const url = `http://export.arxiv.org/api/query?search_query=${encodeURIComponent(searchQuery)}&sortBy=relevance&sortOrder=descending&max_results=5`
+    const response = await fetchWithTimeout(url, {}, 7000) // Timeout estricto de 7 segundos
     const text = await response.text()
+    console.log(`[AcademicSearch] Búsqueda en arXiv completada.`)
 
-    // El parsing de XML puede ser complejo, usamos regex para una extracción simple
     const entries = text.split("<entry>")
-    entries.shift() // Remove the part before the first entry
+    entries.shift()
 
     return entries
       .map((entry: string): AcademicSource | null => {
@@ -89,19 +105,24 @@ async function searchArxiv(query: string): Promise<AcademicSource[]> {
         }
       })
       .filter((item): item is AcademicSource => item !== null)
-  } catch (error) {
-    console.error("Failed to fetch from arXiv API:", error)
+  } catch (error: any) {
+    if (error.name === "AbortError") {
+      console.error("[AcademicSearch] La petición a arXiv ha excedido el tiempo de espera.")
+    } else {
+      console.error("[AcademicSearch] Fallo al contactar la API de arXiv:", error)
+    }
     return []
   }
 }
 
-// Función orquestadora que llama a ambas APIs
+// Función orquestadora principal
 export async function findAcademicSources(query: string): Promise<AcademicSource[]> {
+  console.log(`[AcademicSearch] Orquestando búsquedas académicas para: "${query}"`)
   const [coreResults, arxivResults] = await Promise.all([searchCore(query), searchArxiv(query)])
 
-  // Combinar y eliminar duplicados simples por título
   const allResults = [...coreResults, ...arxivResults]
   const uniqueResults = Array.from(new Map(allResults.map((item) => [item.title.toLowerCase(), item])).values())
 
+  console.log(`[AcademicSearch] Búsquedas combinadas. Encontrados ${uniqueResults.length} resultados únicos.`)
   return uniqueResults
 }
