@@ -46,8 +46,10 @@ export default function EvaluationScreen({ courseData, updateCourseData, onNext,
 
     try {
       const evaluationSuggestion = await generateEvaluationMethod(courseData)
+      const suggestionText =
+        typeof evaluationSuggestion === "string" ? evaluationSuggestion : JSON.stringify(evaluationSuggestion, null, 2)
 
-      updateCourseData({ evaluationMethod: evaluationSuggestion })
+      updateCourseData({ evaluationMethod: suggestionText })
     } catch (error: any) {
       console.error("Error generating evaluation method:", error)
       setAiError(`Error al generar método de evaluación: ${error.message || "Error desconocido"}`)
