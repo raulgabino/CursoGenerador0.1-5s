@@ -187,7 +187,7 @@ export default function CrearCurso() {
           )}
 
           {currentScreen === 3 && (
-            <EvaluationScreen
+            <ContentScreen
               courseData={courseData}
               updateCourseData={updateCourseData}
               onNext={nextScreen}
@@ -196,11 +196,12 @@ export default function CrearCurso() {
           )}
 
           {currentScreen === 4 && (
-            <ContentScreen
+            <EvaluationScreen
               courseData={courseData}
               updateCourseData={updateCourseData}
               onNext={nextScreen}
               onPrev={prevScreen}
+              setError={setError}
             />
           )}
 
