@@ -188,16 +188,24 @@ export default function ContentScreen({ courseData, updateCourseData, onNext, on
                 .split("\n")
                 .filter((line) => line.trim())
                 .map((module, index) => (
-                  <div key={index} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                    <h5 className="font-medium text-gray-800 mb-2">{module}</h5>
+                  <div
+                    key={index}
+                    className="bg-white border border-gray-200 rounded-lg shadow-sm mb-4 overflow-hidden"
+                  >
+                    {/* Encabezado del Módulo */}
+                    <div className="p-4">
+                      <h3 className="font-bold text-lg text-blue-800">{module}</h3>
+                      <p className="text-sm text-gray-600 mt-1">Módulo {index + 1} del curso</p>
+                    </div>
 
-                    <div className="mt-4 pt-4 border-t border-gray-200">
+                    {/* Pie de página con Acciones */}
+                    <div className="bg-gray-50 px-4 py-3 border-t border-gray-200">
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => handleFindSources(index, module)}
                         disabled={loadingSources[index]}
-                        className="transition-all duration-150"
+                        className="transition-all duration-150 bg-white"
                       >
                         {loadingSources[index] ? (
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -207,9 +215,9 @@ export default function ContentScreen({ courseData, updateCourseData, onNext, on
                         Buscar Fuentes para este Módulo
                       </Button>
 
-                      {/* Muestra los resultados solo para el módulo actual */}
+                      {/* Área de Resultados */}
                       {sourceResults[index] && (
-                        <div className="mt-4 rounded-md border bg-gray-50 p-4 text-sm">
+                        <div className="mt-4 rounded-md border border-gray-300 bg-white p-4 text-sm">
                           <h4 className="font-semibold mb-2 text-gray-800">Fuentes Académicas Sugeridas:</h4>
                           <div
                             className="prose prose-sm max-w-none"
