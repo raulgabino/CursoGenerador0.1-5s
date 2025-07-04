@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { motion } from "framer-motion"
-import { Loader2, Sparkles, BookOpen } from "lucide-react"
-import type { CourseData } from "@/types/course"
+import { Loader2, Sparkles, BookOpen, Plus, Trash2 } from "lucide-react"
+import type { CourseData, CourseModule } from "@/types/course"
 import { generateCourseStructure, generateMaterialSuggestions } from "@/app/actions/suggestion-actions"
 import { getExpertContextForCourse } from "@/app/actions/context-actions"
 import { getAndSummarizeSources } from "@/app/actions/source-actions"
@@ -27,11 +28,14 @@ export default function ContentScreen({ courseData, updateCourseData, onNext, on
   const [loadingSources, setLoadingSources] = useState<Record<number, boolean>>({})
   const [sourceResults, setSourceResults] = useState<Record<number, string>>({})
 
+  // Inicializar estructura como array vacío si no existe
+  const modules = courseData.structure || []
+
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
 
-    if (!courseData.structure?.trim()) {
-      newErrors.structure = "La estructura del curso es obligatoria"
+    if (!modules.length) {
+      newErrors.structure = "La estructura del curso es obligatoria. Genera módulos con IA o añade manualmente."
     }
 
     setErrors(newErrors)
@@ -67,9 +71,17 @@ export default function ContentScreen({ courseData, updateCourseData, onNext, on
       }
 
       // Generar la estructura usando el contexto (existente o recién generado)
-      const structureSuggestion = await generateCourseStructure(courseData, expertContext)
+      const structureResult = await generateCourseStructure({
+        ...courseData,
+        ...expertContext,
+      })
 
-      updateCourseData({ structure: structureSuggestion })
+      if ("error" in structureResult) {
+        setAiError(structureResult.error)
+      } else {
+        // Actualizar con el array de módulos
+        updateCourseData({ structure: structureResult })
+      }
     } catch (error: any) {
       console.error("Error generating structure:", error)
       setAiError(`Error al generar estructura: ${error.message || "Error desconocido"}`)
@@ -106,12 +118,16 @@ export default function ContentScreen({ courseData, updateCourseData, onNext, on
     }
   }
 
-  const handleFindSources = async (moduleIndex: number, topic: string) => {
+  const handleFindSources = async (moduleIndex: number, module: CourseModule) => {
     // Activar el estado de carga para este módulo específico
     setLoadingSources((prev) => ({ ...prev, [moduleIndex]: true }))
     // Limpiar resultados anteriores para este módulo
     setSourceResults((prev) => ({ ...prev, [moduleIndex]: "" }))
-    const result = await getAndSummarizeSources(topic)
+
+    // Crear consulta enriquecida con contexto completo
+    const searchQuery = `${courseData.title}: ${module.moduleName} - ${module.moduleDescription}`
+
+    const result = await getAndSummarizeSources(searchQuery)
     if (typeof result === "object" && result.error) {
       setSourceResults((prev) => ({ ...prev, [moduleIndex]: `Error: ${result.error}` }))
     } else if (typeof result === "string") {
@@ -119,6 +135,27 @@ export default function ContentScreen({ courseData, updateCourseData, onNext, on
     }
     // Desactivar el estado de carga para este módulo
     setLoadingSources((prev) => ({ ...prev, [moduleIndex]: false }))
+  }
+
+  const handleAddModule = () => {
+    const newModule: CourseModule = {
+      moduleName: "Nuevo Módulo",
+      moduleDescription: "Descripción del módulo",
+    }
+    updateCourseData({
+      structure: [...modules, newModule],
+    })
+  }
+
+  const handleUpdateModule = (index: number, updatedModule: CourseModule) => {
+    const updatedModules = [...modules]
+    updatedModules[index] = updatedModule
+    updateCourseData({ structure: updatedModules })
+  }
+
+  const handleDeleteModule = (index: number) => {
+    const updatedModules = modules.filter((_, i) => i !== index)
+    updateCourseData({ structure: updatedModules })
   }
 
   return (
@@ -140,94 +177,135 @@ export default function ContentScreen({ courseData, updateCourseData, onNext, on
 
       <div className="space-y-6">
         <div>
-          <div className="flex justify-between items-center mb-2">
-            <Label htmlFor="structure" className="text-base font-medium">
-              Estructura del curso <span className="text-red-500">*</span>
-            </Label>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleGenerateStructure}
-              disabled={isGeneratingStructure || !courseData.title}
-              className="flex items-center gap-1 bg-transparent"
-            >
-              {isGeneratingStructure ? (
-                <>
-                  <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
-                  Generando...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="h-3.5 w-3.5 mr-1" />
-                  Sugerir con IA
-                </>
-              )}
-            </Button>
+          <div className="flex justify-between items-center mb-4">
+            <div>
+              <Label className="text-base font-medium">
+                Estructura del curso <span className="text-red-500">*</span>
+              </Label>
+              <p className="text-sm text-gray-500 mt-1">Define los módulos principales de tu curso</p>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleAddModule}
+                className="flex items-center gap-1 bg-transparent"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Añadir Módulo
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleGenerateStructure}
+                disabled={isGeneratingStructure || !courseData.title}
+                className="flex items-center gap-1 bg-transparent"
+              >
+                {isGeneratingStructure ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                    Generando...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-3.5 w-3.5 mr-1" />
+                    Generar con IA
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
-          <p className="text-sm text-gray-500 mb-2">Enumera los módulos o unidades principales (uno por línea)</p>
-          <Textarea
-            id="structure"
-            value={courseData.structure || ""}
-            onChange={(e) => updateCourseData({ structure: e.target.value })}
-            placeholder="Ej:
-1. Introducción al marketing digital
-2. Fundamentos de SEO
-3. Marketing en redes sociales
-4. Publicidad PPC
-5. Análisis y métricas"
-            rows={6}
-            className={errors.structure ? "border-red-500" : ""}
-          />
-          {errors.structure && <p className="text-red-500 text-sm mt-1">{errors.structure}</p>}
 
-          {/* Mostrar módulos individuales si hay estructura */}
-          {courseData.structure && (
-            <div className="mt-4 space-y-4">
-              <h4 className="font-medium text-blue-800">Módulos del curso:</h4>
-              {courseData.structure
-                .split("\n")
-                .filter((line) => line.trim())
-                .map((module, index) => (
-                  <div
-                    key={index}
-                    className="bg-white border border-gray-200 rounded-lg shadow-sm mb-4 overflow-hidden"
-                  >
-                    {/* Encabezado del Módulo */}
-                    <div className="p-4">
-                      <h3 className="font-bold text-lg text-blue-800">{module}</h3>
-                      <p className="text-sm text-gray-600 mt-1">Módulo {index + 1} del curso</p>
-                    </div>
+          {errors.structure && <p className="text-red-500 text-sm mb-4">{errors.structure}</p>}
 
-                    {/* Pie de página con Acciones */}
-                    <div className="bg-gray-50 px-4 py-3 border-t border-gray-200">
+          {/* Renderizado de módulos como objetos estructurados */}
+          {modules.length > 0 && (
+            <div className="space-y-4">
+              {modules.map((module, index) => (
+                <Card key={index} className="border border-gray-200 shadow-sm">
+                  <CardHeader className="pb-3">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <CardTitle className="text-lg text-blue-800 mb-2">Módulo {index + 1}</CardTitle>
+                        <input
+                          type="text"
+                          value={module.moduleName}
+                          onChange={(e) =>
+                            handleUpdateModule(index, {
+                              ...module,
+                              moduleName: e.target.value,
+                            })
+                          }
+                          className="w-full text-base font-medium bg-transparent border-none outline-none focus:bg-gray-50 rounded px-2 py-1"
+                          placeholder="Nombre del módulo"
+                        />
+                      </div>
                       <Button
-                        variant="outline"
+                        variant="ghost"
                         size="sm"
-                        onClick={() => handleFindSources(index, module)}
-                        disabled={loadingSources[index]}
-                        className="transition-all duration-150 bg-white"
+                        onClick={() => handleDeleteModule(index)}
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50"
                       >
-                        {loadingSources[index] ? (
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        ) : (
-                          <BookOpen className="mr-2 h-4 w-4" />
-                        )}
-                        Buscar Fuentes para este Módulo
+                        <Trash2 className="h-4 w-4" />
                       </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="space-y-4">
+                      <div>
+                        <Label className="text-sm font-medium text-gray-700 mb-2 block">Descripción del módulo</Label>
+                        <Textarea
+                          value={module.moduleDescription}
+                          onChange={(e) =>
+                            handleUpdateModule(index, {
+                              ...module,
+                              moduleDescription: e.target.value,
+                            })
+                          }
+                          placeholder="Describe qué aprenderán los estudiantes en este módulo..."
+                          rows={3}
+                          className="resize-none"
+                        />
+                      </div>
 
-                      {/* Área de Resultados */}
+                      <div className="flex justify-between items-center pt-2 border-t border-gray-100">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleFindSources(index, module)}
+                          disabled={loadingSources[index]}
+                          className="transition-all duration-150"
+                        >
+                          {loadingSources[index] ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : (
+                            <BookOpen className="mr-2 h-4 w-4" />
+                          )}
+                          Buscar Fuentes Académicas
+                        </Button>
+                      </div>
+
+                      {/* Área de Resultados de Fuentes */}
                       {sourceResults[index] && (
-                        <div className="mt-4 rounded-md border border-gray-300 bg-white p-4 text-sm">
+                        <div className="mt-4 rounded-md border border-gray-300 bg-gray-50 p-4 text-sm">
                           <h4 className="font-semibold mb-2 text-gray-800">Fuentes Académicas Sugeridas:</h4>
                           <div
-                            className="prose prose-sm max-w-none"
+                            className="prose prose-sm max-w-none text-gray-700"
                             dangerouslySetInnerHTML={{ __html: sourceResults[index].replace(/\n/g, "<br />") }}
                           />
                         </div>
                       )}
                     </div>
-                  </div>
-                ))}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          {modules.length === 0 && (
+            <div className="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+              <p className="text-gray-500 mb-4">No hay módulos definidos</p>
+              <p className="text-sm text-gray-400">Usa "Generar con IA" o "Añadir Módulo" para comenzar</p>
             </div>
           )}
         </div>

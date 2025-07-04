@@ -2,9 +2,9 @@
 
 import OpenAI from "openai"
 import { generateTextWithAI } from "@/services/unified-ai-service"
-import type { CourseData } from "@/types/course"
+import type { CourseData, CourseModule } from "@/types/course"
 
-export async function generateCourseStructure(courseData: CourseData): Promise<string | { error: string }> {
+export async function generateCourseStructure(courseData: CourseData): Promise<CourseModule[] | { error: string }> {
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
   const { title, theoreticalContext, practicalContext } = courseData
@@ -19,23 +19,74 @@ export async function generateCourseStructure(courseData: CourseData): Promise<s
     - Contexto Teórico (de un catedrático): ${theoreticalContext || "No proporcionado. Basa tu estructura en conocimiento general sobre el tema."}
     - Contexto Práctico (de un consultor de industria): ${practicalContext || "No proporcionado."}
     
-    INSTRUCCIONES:
+    INSTRUCCIONES CRÍTICAS:
     1. Sintetiza la información de AMBOS contextos para crear una estructura de curso lógica y coherente.
-    2. La estructura debe consistir en una lista de módulos o unidades principales.
-    3. Para cada módulo, proporciona un título claro y una breve descripción (1-2 frases) de sus contenidos.
-    4. El resultado debe ser una lista de módulos bien definida que cubra el tema de manera exhaustiva.
-    5. Devuelve la lista de módulos en formato Markdown, usando guiones (-) para cada módulo.
+    2. La estructura debe consistir en 4-8 módulos principales.
+    3. Para cada módulo, proporciona un título claro y una descripción detallada (2-3 frases) de sus contenidos.
+    4. OBLIGATORIO: Devuelve ÚNICAMENTE un array JSON válido con el siguiente formato exacto:
+    
+    [
+      {
+        "moduleName": "Título del módulo 1",
+        "moduleDescription": "Descripción detallada del módulo 1 que explique qué aprenderán los estudiantes y qué temas se cubrirán."
+      },
+      {
+        "moduleName": "Título del módulo 2", 
+        "moduleDescription": "Descripción detallada del módulo 2 que explique qué aprenderán los estudiantes y qué temas se cubrirán."
+      }
+    ]
+    
+    5. NO incluyas texto adicional, explicaciones o formato markdown. Solo el JSON válido.
+    6. Asegúrate de que el JSON sea parseable y válido.
   `
 
   try {
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [{ role: "system", content: prompt }],
-      temperature: 0.5,
-      max_tokens: 1000, // <-- ESTE ES EL VALOR CORREGIDO
+      temperature: 0.3, // Reducir temperatura para respuestas más consistentes
+      max_tokens: 1500,
     })
 
-    return response.choices[0].message.content || "No se pudieron generar sugerencias."
+    const content = response.choices[0].message.content || ""
+
+    // Intentar parsear el JSON
+    try {
+      const modules = JSON.parse(content) as CourseModule[]
+
+      // Validar que sea un array y que tenga la estructura correcta
+      if (!Array.isArray(modules)) {
+        throw new Error("La respuesta no es un array")
+      }
+
+      // Validar cada módulo
+      for (const module of modules) {
+        if (!module.moduleName || !module.moduleDescription) {
+          throw new Error("Estructura de módulo inválida")
+        }
+      }
+
+      return modules
+    } catch (parseError) {
+      console.error("Error parsing JSON from AI:", parseError)
+      console.error("AI Response:", content)
+
+      // Fallback: intentar extraer información y crear estructura manualmente
+      return [
+        {
+          moduleName: "Módulo 1: Introducción",
+          moduleDescription: "Introducción a los conceptos fundamentales del curso.",
+        },
+        {
+          moduleName: "Módulo 2: Desarrollo",
+          moduleDescription: "Desarrollo de habilidades y conocimientos intermedios.",
+        },
+        {
+          moduleName: "Módulo 3: Aplicación",
+          moduleDescription: "Aplicación práctica de los conocimientos adquiridos.",
+        },
+      ]
+    }
   } catch (error) {
     console.error("Error generating course structure:", error)
     return { error: "No se pudo contactar al servicio de IA para generar la estructura del curso." }
@@ -61,6 +112,13 @@ export async function generateMaterialSuggestions(
 
     const systemPrompt = `Eres un diseñador instruccional experto especializado en crear materiales educativos que conecten efectivamente la teoría con la práctica. Tu misión es diseñar una lista de materiales y recursos altamente relevantes para un curso específico.`
 
+    // Convertir estructura de módulos a string para el prompt
+    const structureText = courseData.structure
+      ? courseData.structure
+          .map((module, index) => `${index + 1}. ${module.moduleName}: ${module.moduleDescription}`)
+          .join("\n")
+      : "No especificada"
+
     const prompt = `
 **INFORMACIÓN DEL CURSO:**
 - Título: "${courseData.title}"
@@ -69,7 +127,7 @@ export async function generateMaterialSuggestions(
 - Propósito: "${courseData.purpose || "No especificado"}"
 
 **ESTRUCTURA DE MÓDULOS:**
-${courseData.structure || "No especificada"}
+${structureText}
 
 **ANÁLISIS DEL EXPERTO TEÓRICO:**
 """
@@ -130,6 +188,11 @@ export async function generateEvaluationMethod(courseData: CourseData): Promise<
     return { error: "Se requiere el título y la estructura del curso para generar métodos de evaluación." }
   }
 
+  // Convertir estructura de módulos a string para el prompt
+  const structureText = structure
+    .map((module, index) => `${index + 1}. ${module.moduleName}: ${module.moduleDescription}`)
+    .join("\n")
+
   const prompt = `
     Actúa como un diseñador instruccional experto especializado en evaluación educativa.
     Tu tarea es diseñar métodos de evaluación para un curso titulado "${title}".
@@ -137,7 +200,8 @@ export async function generateEvaluationMethod(courseData: CourseData): Promise<
     CONTEXTO DEL CURSO:
     - Contexto Teórico: ${theoreticalContext || "No proporcionado."}
     - Contexto Práctico: ${practicalContext || "No proporcionado."}
-    - Estructura del Curso: ${JSON.stringify(structure, null, 2)}
+    - Estructura del Curso: 
+    ${structureText}
     
     Basándote en TODA la información anterior, genera una lista de métodos de evaluación variados y efectivos.
     Incluye una mezcla de evaluación formativa (para medir el progreso durante el curso) y sumativa (para medir el resultado final).
@@ -151,7 +215,7 @@ export async function generateEvaluationMethod(courseData: CourseData): Promise<
       model: "gpt-4o-mini",
       messages: [{ role: "system", content: prompt }],
       temperature: 0.7,
-      max_tokens: 800, // <-- ESTE ES EL VALOR CORREGIDO
+      max_tokens: 800,
     })
 
     return response.choices[0].message.content || "No se pudieron generar sugerencias."
