@@ -17,6 +17,7 @@ import type {
   GetBlueprintResponse,
   CourseBlueprint_DB,
 } from "@/types/course-blueprint-persistence"
+import ModuleCard from "@/components/module-card"
 
 export default function BlueprintGenerator() {
   const searchParams = useSearchParams()
@@ -40,6 +41,7 @@ export default function BlueprintGenerator() {
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle")
   const [courseBlueprint, setCourseBlueprint] = useState<CourseBlueprint | null>(null)
   const [savedBlueprintData, setSavedBlueprintData] = useState<CourseBlueprint_DB | null>(null)
+  const [moduleSourcesResults, setModuleSourcesResults] = useState<Record<number, string>>({})
 
   // Load existing blueprint if ID is provided
   useEffect(() => {
@@ -76,6 +78,14 @@ export default function BlueprintGenerator() {
     } finally {
       setIsLoadingBlueprint(false)
     }
+  }
+
+  // Handle module sources found
+  const handleModuleSourcesFound = (moduleIndex: number, sources: string) => {
+    setModuleSourcesResults((prev) => ({
+      ...prev,
+      [moduleIndex]: sources,
+    }))
   }
 
   // Handle form field changes
@@ -710,9 +720,25 @@ export default function BlueprintGenerator() {
               </CardContent>
             </Card>
 
-            {/* Modules - Editable */}
+            {/* Modules with Academic Sources - Using ModuleCard Component */}
             <div className="space-y-4">
               <h2 className="text-xl font-bold text-blue-800">Módulos del Curso</h2>
+              <div className="grid gap-6">
+                {courseBlueprint.modules.map((module, moduleIndex) => (
+                  <ModuleCard
+                    key={moduleIndex}
+                    module={module}
+                    moduleIndex={moduleIndex}
+                    courseTitle={courseBlueprint.courseTitle}
+                    onSourcesFound={handleModuleSourcesFound}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* Editable Modules Section - Keep the original editing interface */}
+            <div className="space-y-4">
+              <h2 className="text-xl font-bold text-blue-800">Editor de Módulos</h2>
               {courseBlueprint.modules.map((module, moduleIndex) => (
                 <Card key={moduleIndex}>
                   <CardHeader>
