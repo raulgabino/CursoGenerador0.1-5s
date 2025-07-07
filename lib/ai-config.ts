@@ -1,51 +1,46 @@
+// Configuración centralizada para todos los proveedores de IA
 export const AI_CONFIG = {
   openai: {
     apiKey: process.env.WHORKSHOP_OPENAI_API_KEY,
-    baseURL: "https://api.openai.com/v1",
-    models: {
-      gpt4: "gpt-4o",
-      gpt35: "gpt-3.5-turbo",
-      gpt4mini: "gpt-4o-mini",
-    },
+    model: "gpt-4o-mini",
+    maxTokens: 2000,
+    temperature: 0.7,
   },
   anthropic: {
     apiKey: process.env.ANTHROPIC_API_KEY,
-    baseURL: "https://api.anthropic.com",
-    models: {
-      claude3: "claude-3-sonnet-20240229",
-      claude35: "claude-3-5-sonnet-20241022",
-    },
+    model: "claude-3-haiku-20240307",
+    maxTokens: 2000,
+    temperature: 0.7,
   },
   google: {
     apiKey: process.env.GOOGLE_API_KEY,
-    models: {
-      gemini: "gemini-1.5-pro",
-    },
+    model: "gemini-1.5-flash",
+    maxTokens: 2000,
+    temperature: 0.7,
   },
   cohere: {
     apiKey: process.env.COHERE_API_KEY,
-    models: {
-      command: "command-r-plus",
-    },
+    model: "command-r-plus",
+    maxTokens: 2000,
+    temperature: 0.7,
   },
 }
 
-export function validateAIConfig() {
-  const providers = []
+// Función para validar si un proveedor está disponible
+export function isProviderAvailable(provider: keyof typeof AI_CONFIG): boolean {
+  const config = AI_CONFIG[provider]
+  return !!config.apiKey
+}
 
-  if (AI_CONFIG.openai.apiKey) providers.push("openai")
-  if (AI_CONFIG.anthropic.apiKey) providers.push("anthropic")
-  if (AI_CONFIG.google.apiKey) providers.push("google")
-  if (AI_CONFIG.cohere.apiKey) providers.push("cohere")
+// Función para obtener proveedores disponibles
+export function getAvailableProviders(): Array<keyof typeof AI_CONFIG> {
+  return Object.keys(AI_CONFIG).filter((provider) => isProviderAvailable(provider as keyof typeof AI_CONFIG)) as Array<
+    keyof typeof AI_CONFIG
+  >
+}
 
-  return {
-    hasValidProviders: providers.length > 0,
-    availableProviders: providers,
-    missingKeys: [
-      !AI_CONFIG.openai.apiKey && "WHORKSHOP_OPENAI_API_KEY",
-      !AI_CONFIG.anthropic.apiKey && "ANTHROPIC_API_KEY",
-      !AI_CONFIG.google.apiKey && "GOOGLE_API_KEY",
-      !AI_CONFIG.cohere.apiKey && "COHERE_API_KEY",
-    ].filter(Boolean),
-  }
+// Función para obtener el primer proveedor disponible
+export function getFirstAvailableProvider(): keyof typeof AI_CONFIG | null {
+  const available = getAvailableProviders()
+  return available.length > 0 ? available[0] : null
 }

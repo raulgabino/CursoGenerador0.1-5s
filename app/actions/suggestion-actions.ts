@@ -39,23 +39,8 @@ export async function generateCourseStructure(courseData: any): Promise<CourseMo
       return { error: "No se pudieron generar módulos para el curso" }
     }
 
-    // Validar estructura de cada módulo
-    const validatedModules: CourseModule[] = modules.map((module, index) => {
-      const validatedModule: CourseModule = {
-        id: typeof module.id === "string" ? module.id : `modulo-${index + 1}`,
-        title: typeof module.title === "string" ? module.title : `Módulo ${index + 1}`,
-        description: typeof module.description === "string" ? module.description : "Descripción del módulo",
-        duration: typeof module.duration === "string" ? module.duration : "2 horas",
-        objectives: Array.isArray(module.objectives) ? module.objectives : ["Objetivo principal"],
-        topics: Array.isArray(module.topics) ? module.topics : ["Tema principal"],
-      }
-
-      console.log(`✅ Módulo ${index + 1} validado:`, validatedModule.title)
-      return validatedModule
-    })
-
     console.log("🎉 Estructura de curso generada y validada exitosamente")
-    return validatedModules
+    return modules
   } catch (error: any) {
     console.error("❌ Error al generar estructura de curso:", error)
     console.error("📊 Stack trace:", error.stack)
@@ -203,36 +188,5 @@ La salida debe ser en formato Markdown.
   } catch (error: any) {
     console.error("Error generating evaluation methods:", error)
     return { error: "No se pudo contactar al servicio de IA para generar sugerencias de evaluación." }
-  }
-}
-
-// Función para validar datos del curso
-export function validateCourseData(courseData: any): { isValid: boolean; errors: string[] } {
-  const errors: string[] = []
-
-  if (!courseData) {
-    errors.push("No se proporcionaron datos del curso")
-    return { isValid: false, errors }
-  }
-
-  if (!courseData.title || courseData.title.trim() === "") {
-    errors.push("El título del curso es requerido")
-  }
-
-  if (!courseData.audience || courseData.audience.trim() === "") {
-    errors.push("La audiencia objetivo es requerida")
-  }
-
-  if (!courseData.problem || courseData.problem.trim() === "") {
-    errors.push("El problema que resuelve el curso es requerido")
-  }
-
-  if (!courseData.purpose || courseData.purpose.trim() === "") {
-    errors.push("El propósito del curso es requerido")
-  }
-
-  return {
-    isValid: errors.length === 0,
-    errors,
   }
 }
