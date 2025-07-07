@@ -1,399 +1,284 @@
-"use server"
+import OpenAI from "openai"
+import { GoogleGenerativeAI } from "@google/generative-ai"
+import { AI_CONFIG, validateAIConfig } from "@/lib/ai-config"
+import type { CourseModule } from "@/types/course"
 
-import { generateText } from "ai"
-import { openaiClient, validateAIConfig, defaultGenerationConfig } from "@/lib/ai-config"
-import { generateTextWithClaude, isAnthropicAvailable } from "./anthropic-service"
-import { generateTextWithGemini, isGeminiAvailable } from "./gemini-service"
-import { generateTextWithCohere, isCohereAvailable, generateChatWithCohere } from "./cohere-service"
-import { AI_CONFIG, type AIProvider, getPreferredProvider } from "@/lib/ai-config"
+export interface AIProvider {
+  name: string
+  available: boolean
+  error?: string
+}
 
-export class UnifiedAIService {
-  private static instance: UnifiedAIService
+export interface GenerateTextOptions {
+  provider?: "openai" | "anthropic" | "google" | "cohere"
+  fallbackProviders?: ("openai" | "anthropic" | "google" | "cohere")[]
+  maxTokens?: number
+  temperature?: number
+}
 
-  private constructor() {
-    try {
-      validateAIConfig()
-    } catch (error) {
-      console.error("❌ Error en configuración de IA:", error)
-      throw error
-    }
+export interface GenerateTextResult {
+  text: string
+  provider: string
+  usage?: {
+    promptTokens: number
+    completionTokens: number
+    totalTokens: number
   }
+}
 
-  static getInstance(): UnifiedAIService {
-    if (!UnifiedAIService.instance) {
-      UnifiedAIService.instance = new UnifiedAIService()
-    }
-    return UnifiedAIService.instance
+// Cliente OpenAI
+let openaiClient: OpenAI | null = null
+function getOpenAIClient(): OpenAI {
+  if (!openaiClient && AI_CONFIG.openai.apiKey) {
+    openaiClient = new OpenAI({
+      apiKey: AI_CONFIG.openai.apiKey,
+    })
   }
+  if (!openaiClient) {
+    throw new Error("OpenAI client not available - API key missing")
+  }
+  return openaiClient
+}
 
-  async generateText(prompt: string, systemPrompt?: string): Promise<string> {
+// Cliente Google
+let googleClient: GoogleGenerativeAI | null = null
+function getGoogleClient(): GoogleGenerativeAI {
+  if (!googleClient && AI_CONFIG.google.apiKey) {
+    googleClient = new GoogleGenerativeAI(AI_CONFIG.google.apiKey)
+  }
+  if (!googleClient) {
+    throw new Error("Google AI client not available - API key missing")
+  }
+  return googleClient
+}
+
+export async function generateTextWithAI(
+  prompt: string,
+  systemPrompt?: string,
+  options: GenerateTextOptions = {},
+): Promise<GenerateTextResult> {
+  const {
+    provider = "openai",
+    fallbackProviders = ["anthropic", "google", "cohere"],
+    maxTokens = 1000,
+    temperature = 0.7,
+  } = options
+
+  const providersToTry = [provider, ...fallbackProviders]
+
+  for (const currentProvider of providersToTry) {
     try {
-      console.log("🤖 Generando texto con IA...")
-      console.log("📝 Prompt:", prompt.substring(0, 100) + "...")
+      console.log(`🤖 Intentando generar texto con ${currentProvider}...`)
 
-      const { text } = await generateText({
-        model: openaiClient("gpt-4o-mini"),
-        system: systemPrompt || "Eres un asistente experto en diseño instruccional y creación de cursos educativos.",
-        prompt,
-        ...defaultGenerationConfig,
-      })
+      switch (currentProvider) {
+        case "openai":
+          if (!AI_CONFIG.openai.apiKey) {
+            console.log("⚠️ OpenAI API key no disponible, saltando...")
+            continue
+          }
 
-      console.log("✅ Texto generado exitosamente")
-      console.log("📄 Respuesta:", text.substring(0, 200) + "...")
+          const openai = getOpenAIClient()
+          const messages: any[] = []
 
-      return text
+          if (systemPrompt) {
+            messages.push({ role: "system", content: systemPrompt })
+          }
+          messages.push({ role: "user", content: prompt })
+
+          const openaiResponse = await openai.chat.completions.create({
+            model: AI_CONFIG.openai.models.gpt4mini,
+            messages,
+            max_tokens: maxTokens,
+            temperature,
+          })
+
+          const text = openaiResponse.choices[0]?.message?.content || ""
+          console.log(`✅ Texto generado exitosamente con OpenAI (${text.length} caracteres)`)
+
+          return {
+            text,
+            provider: "openai",
+            usage: {
+              promptTokens: openaiResponse.usage?.prompt_tokens || 0,
+              completionTokens: openaiResponse.usage?.completion_tokens || 0,
+              totalTokens: openaiResponse.usage?.total_tokens || 0,
+            },
+          }
+
+        case "google":
+          if (!AI_CONFIG.google.apiKey) {
+            console.log("⚠️ Google API key no disponible, saltando...")
+            continue
+          }
+
+          const google = getGoogleClient()
+          const model = google.getGenerativeModel({ model: AI_CONFIG.google.models.gemini })
+
+          const fullPrompt = systemPrompt ? `${systemPrompt}\n\n${prompt}` : prompt
+          const googleResponse = await model.generateContent(fullPrompt)
+          const googleText = googleResponse.response.text()
+
+          console.log(`✅ Texto generado exitosamente con Google (${googleText.length} caracteres)`)
+
+          return {
+            text: googleText,
+            provider: "google",
+          }
+
+        case "anthropic":
+          console.log("⚠️ Anthropic no implementado aún, saltando...")
+          continue
+
+        case "cohere":
+          console.log("⚠️ Cohere no implementado aún, saltando...")
+          continue
+
+        default:
+          console.log(`⚠️ Proveedor desconocido: ${currentProvider}`)
+          continue
+      }
     } catch (error: any) {
-      console.error("❌ Error al generar texto:", error)
+      console.error(`❌ Error con ${currentProvider}:`, error.message)
 
-      // Manejo específico de errores de OpenAI
-      if (error?.message?.includes("API key")) {
-        throw new Error("Clave de API de OpenAI inválida o no configurada")
+      // Si es el último proveedor, lanzar el error
+      if (currentProvider === providersToTry[providersToTry.length - 1]) {
+        throw new Error(`Todos los proveedores de IA fallaron. Último error: ${error.message}`)
       }
 
-      if (error?.message?.includes("quota")) {
-        throw new Error("Cuota de API de OpenAI agotada")
-      }
-
-      if (error?.message?.includes("rate limit")) {
-        throw new Error("Límite de velocidad de API excedido")
-      }
-
-      throw new Error(`Error del servicio de IA: ${error?.message || "Error desconocido"}`)
+      // Continuar con el siguiente proveedor
+      continue
     }
   }
 
-  async generateCourseStructure(courseData: any): Promise<any[]> {
-    const prompt = `
-Basándote en la siguiente información del curso, genera una estructura de módulos en formato JSON:
+  throw new Error("No hay proveedores de IA disponibles")
+}
 
-Título: ${courseData.title}
-Audiencia: ${courseData.audience}
-Problema que resuelve: ${courseData.problem}
-Propósito: ${courseData.purpose}
-Modalidad: ${courseData.modality}
-Duración: ${courseData.duration}
-Nivel: ${courseData.experience}
+export async function getAIProvidersStatus(): Promise<AIProvider[]> {
+  const config = validateAIConfig()
 
-Genera entre 4-8 módulos que cubran el contenido de manera lógica y progresiva.
+  return [
+    {
+      name: "OpenAI",
+      available: !!AI_CONFIG.openai.apiKey,
+      error: !AI_CONFIG.openai.apiKey ? "API key missing" : undefined,
+    },
+    {
+      name: "Anthropic",
+      available: !!AI_CONFIG.anthropic.apiKey,
+      error: !AI_CONFIG.anthropic.apiKey ? "API key missing" : undefined,
+    },
+    {
+      name: "Google",
+      available: !!AI_CONFIG.google.apiKey,
+      error: !AI_CONFIG.google.apiKey ? "API key missing" : undefined,
+    },
+    {
+      name: "Cohere",
+      available: !!AI_CONFIG.cohere.apiKey,
+      error: !AI_CONFIG.cohere.apiKey ? "API key missing" : undefined,
+    },
+  ]
+}
 
-Responde ÚNICAMENTE con un array JSON válido con esta estructura:
+// Función específica para generar estructura de curso
+export async function generateCourseStructureWithAI(courseData: any): Promise<CourseModule[]> {
+  const systemPrompt = `Eres un diseñador instruccional experto. Tu tarea es crear una estructura de módulos para un curso educativo.
+
+INSTRUCCIONES CRÍTICAS:
+1. Debes devolver ÚNICAMENTE un array JSON válido.
+2. NO incluyas texto adicional, explicaciones o formato markdown.
+3. El JSON debe ser parseable directamente.
+4. Cada módulo debe tener exactamente las propiedades: id, title, description, duration, objectives, topics.`
+
+  const prompt = `
+Crea una estructura de 4-6 módulos para un curso titulado "${courseData.title}".
+
+Información del curso:
+- Audiencia: ${courseData.audience}
+- Problema que resuelve: ${courseData.problem}
+- Propósito: ${courseData.purpose}
+- Modalidad: ${courseData.modality || "No especificada"}
+- Duración: ${courseData.duration || "No especificada"}
+
+Devuelve ÚNICAMENTE un array JSON con este formato exacto:
 [
   {
     "id": "modulo-1",
-    "title": "Título del módulo",
-    "description": "Descripción detallada del módulo",
+    "title": "Título del módulo 1",
+    "description": "Descripción detallada del módulo 1",
     "duration": "2 horas",
     "objectives": ["Objetivo 1", "Objetivo 2"],
     "topics": ["Tema 1", "Tema 2", "Tema 3"]
   }
 ]
-`
 
-    try {
-      const response = await this.generateText(prompt)
+IMPORTANTE: Responde SOLO con el JSON, sin texto adicional.`
 
-      // Limpiar la respuesta para extraer solo el JSON
-      let cleanResponse = response.trim()
-
-      // Buscar el inicio del array JSON
-      const jsonStart = cleanResponse.indexOf("[")
-      const jsonEnd = cleanResponse.lastIndexOf("]") + 1
-
-      if (jsonStart !== -1 && jsonEnd > jsonStart) {
-        cleanResponse = cleanResponse.substring(jsonStart, jsonEnd)
-      }
-
-      console.log("🔍 Respuesta limpia:", cleanResponse)
-
-      const modules = JSON.parse(cleanResponse)
-
-      // Validar estructura
-      if (!Array.isArray(modules)) {
-        throw new Error("La respuesta no es un array válido")
-      }
-
-      // Validar cada módulo
-      const validatedModules = modules.map((module, index) => ({
-        id: module.id || `modulo-${index + 1}`,
-        title: module.title || `Módulo ${index + 1}`,
-        description: module.description || "Descripción del módulo",
-        duration: module.duration || "2 horas",
-        objectives: Array.isArray(module.objectives) ? module.objectives : ["Objetivo principal"],
-        topics: Array.isArray(module.topics) ? module.topics : ["Tema principal"],
-      }))
-
-      console.log("✅ Módulos validados:", validatedModules.length)
-      return validatedModules
-    } catch (error: any) {
-      console.error("❌ Error al generar estructura:", error)
-
-      // Estructura fallback
-      return [
-        {
-          id: "modulo-1",
-          title: "Introducción y Fundamentos",
-          description: "Módulo introductorio que establece las bases del curso",
-          duration: "2 horas",
-          objectives: ["Comprender los conceptos básicos", "Establecer objetivos de aprendizaje"],
-          topics: ["Conceptos fundamentales", "Objetivos del curso", "Metodología"],
-        },
-        {
-          id: "modulo-2",
-          title: "Desarrollo Teórico",
-          description: "Desarrollo de los conceptos teóricos principales",
-          duration: "3 horas",
-          objectives: ["Dominar la teoría", "Aplicar conceptos"],
-          topics: ["Marco teórico", "Principios clave", "Casos de estudio"],
-        },
-        {
-          id: "modulo-3",
-          title: "Aplicación Práctica",
-          description: "Aplicación práctica de los conocimientos adquiridos",
-          duration: "3 horas",
-          objectives: ["Implementar soluciones", "Resolver problemas"],
-          topics: ["Ejercicios prácticos", "Proyectos", "Resolución de problemas"],
-        },
-        {
-          id: "modulo-4",
-          title: "Evaluación y Cierre",
-          description: "Evaluación final y consolidación del aprendizaje",
-          duration: "2 horas",
-          objectives: ["Evaluar el aprendizaje", "Consolidar conocimientos"],
-          topics: ["Evaluación final", "Retroalimentación", "Próximos pasos"],
-        },
-      ]
-    }
-  }
-}
-
-export const aiService = UnifiedAIService.getInstance()
-
-// Función para generar texto con OpenAI usando AI SDK
-async function generateTextWithOpenAI(
-  prompt: string,
-  systemPrompt?: string,
-  options?: {
-    model?: string
-    maxTokens?: number
-    temperature?: number
-  },
-): Promise<string> {
   try {
-    console.log("🔍 DIAGNÓSTICO - Iniciando generateTextWithOpenAI...")
-
-    if (!process.env.WHORKSHOP_OPENAI_API_KEY) {
-      console.error("🔍 DIAGNÓSTICO - WHORKSHOP_OPENAI_API_KEY no está configurada")
-      throw new Error("WHORKSHOP_OPENAI_API_KEY no está configurada")
-    }
-
-    console.log("🔍 DIAGNÓSTICO - Enviando request a OpenAI...")
-    const { text } = await generateText({
-      model: openaiClient(options?.model || AI_CONFIG.openai.model),
-      system: systemPrompt,
-      prompt,
-      temperature: options?.temperature || 0.7,
-      maxTokens: options?.maxTokens || 2000,
+    const result = await generateTextWithAI(prompt, systemPrompt, {
+      provider: "openai",
+      fallbackProviders: ["google"],
+      maxTokens: 2000,
+      temperature: 0.3,
     })
 
-    if (!text) {
-      console.error("🔍 DIAGNÓSTICO - No se recibió contenido de OpenAI")
-      throw new Error("No se recibió contenido de OpenAI")
+    // Limpiar la respuesta
+    let cleanedResponse = result.text.trim()
+
+    // Remover bloques de código markdown si existen
+    const jsonMatch = cleanedResponse.match(/```(?:json)?\s*([\s\S]*?)\s*```/)
+    if (jsonMatch) {
+      cleanedResponse = jsonMatch[1].trim()
     }
 
-    console.log("🔍 DIAGNÓSTICO - Respuesta exitosa de OpenAI, longitud:", text.length)
-    return text
+    // Parsear JSON
+    const modules = JSON.parse(cleanedResponse)
+
+    // Validar estructura
+    if (!Array.isArray(modules)) {
+      throw new Error("La respuesta no es un array válido")
+    }
+
+    // Validar cada módulo y asegurar estructura correcta
+    const validatedModules: CourseModule[] = modules.map((module, index) => ({
+      id: module.id || `modulo-${index + 1}`,
+      title: module.title || `Módulo ${index + 1}`,
+      description: module.description || "Descripción del módulo",
+      duration: module.duration || "2 horas",
+      objectives: Array.isArray(module.objectives) ? module.objectives : ["Objetivo principal"],
+      topics: Array.isArray(module.topics) ? module.topics : ["Tema principal"],
+    }))
+
+    return validatedModules
   } catch (error: any) {
-    console.error("🔍 DIAGNÓSTICO - Error al generar texto con OpenAI:", error)
+    console.error("Error parseando respuesta de IA:", error)
 
-    // Proporcionar más detalles sobre el error
-    if (error.message?.includes("API key")) {
-      throw new Error(`Error de OpenAI: API key inválida. Verifica WHORKSHOP_OPENAI_API_KEY`)
-    } else if (error.message?.includes("quota")) {
-      throw new Error(`Error de OpenAI: Cuota insuficiente. Verifica el saldo de la cuenta`)
-    } else {
-      throw new Error(`Error de OpenAI: ${error.message || "Error desconocido"}`)
-    }
+    // Fallback: estructura básica
+    return [
+      {
+        id: "modulo-1",
+        title: "Introducción",
+        description: `Introducción a los conceptos fundamentales de ${courseData.title}`,
+        duration: "2 horas",
+        objectives: ["Comprender los objetivos del curso", "Conocer los conceptos básicos"],
+        topics: ["Presentación del curso", "Conceptos fundamentales", "Metodología"],
+      },
+      {
+        id: "modulo-2",
+        title: "Fundamentos",
+        description: `Desarrollo de conocimientos básicos sobre ${courseData.title}`,
+        duration: "3 horas",
+        objectives: ["Dominar los principios básicos", "Aplicar conceptos fundamentales"],
+        topics: ["Principios teóricos", "Metodologías", "Casos de estudio"],
+      },
+      {
+        id: "modulo-3",
+        title: "Aplicación Práctica",
+        description: `Aplicación práctica de los conocimientos adquiridos`,
+        duration: "4 horas",
+        objectives: ["Implementar soluciones prácticas", "Resolver problemas reales"],
+        topics: ["Ejercicios prácticos", "Proyectos", "Evaluación"],
+      },
+    ]
   }
-}
-
-// Función unificada para generar texto con cualquier proveedor
-export async function generateTextWithAI(
-  prompt: string,
-  systemPrompt?: string,
-  options?: {
-    provider?: AIProvider
-    model?: string
-    maxTokens?: number
-    temperature?: number
-    fallbackProviders?: AIProvider[]
-  },
-): Promise<{
-  text: string
-  provider: AIProvider
-  success: boolean
-}> {
-  const preferredProvider = options?.provider || (await getPreferredProvider())
-  const fallbackProviders = options?.fallbackProviders || ["openai", "cohere", "anthropic", "google"]
-
-  // Lista de proveedores a intentar
-  const providersToTry: AIProvider[] = []
-
-  if (preferredProvider) {
-    providersToTry.push(preferredProvider)
-  }
-
-  // Añadir fallbacks que no estén ya en la lista
-  for (const provider of fallbackProviders) {
-    if (!providersToTry.includes(provider)) {
-      providersToTry.push(provider)
-    }
-  }
-
-  let lastError: Error | null = null
-
-  for (const provider of providersToTry) {
-    try {
-      console.log(`🔍 DIAGNÓSTICO - Intentando generar texto con ${provider}...`)
-
-      let text: string
-
-      switch (provider) {
-        case "openai":
-          if (!AI_CONFIG.openai.apiKey) {
-            console.log("🔍 DIAGNÓSTICO - WHORKSHOP_OPENAI_API_KEY no disponible, saltando OpenAI")
-            continue
-          }
-          text = await generateTextWithOpenAI(prompt, systemPrompt, options)
-          break
-
-        case "cohere":
-          if (!(await isCohereAvailable())) continue
-          // Usar chat si hay system prompt, generate si no
-          if (systemPrompt) {
-            text = await generateChatWithCohere(
-              [
-                { role: "system", content: systemPrompt },
-                { role: "user", content: prompt },
-              ],
-              options,
-            )
-          } else {
-            text = await generateTextWithCohere(prompt, systemPrompt, options)
-          }
-          break
-
-        case "anthropic":
-          if (!(await isAnthropicAvailable())) continue
-          text = await generateTextWithClaude(prompt, systemPrompt, options)
-          break
-
-        case "google":
-          if (!(await isGeminiAvailable())) continue
-          text = await generateTextWithGemini(prompt, systemPrompt, options)
-          break
-
-        default:
-          continue
-      }
-
-      console.log(`🔍 DIAGNÓSTICO - Texto generado exitosamente con ${provider}`)
-      return {
-        text,
-        provider,
-        success: true,
-      }
-    } catch (error: any) {
-      console.error(`🔍 DIAGNÓSTICO - Error con ${provider}:`, error.message)
-      lastError = error
-      continue
-    }
-  }
-
-  // Si llegamos aquí, todos los proveedores fallaron
-  throw new Error(`Todos los proveedores de IA fallaron. Último error: ${lastError?.message || "Error desconocido"}`)
-}
-
-// Función para obtener el estado de todos los proveedores
-export async function getAIProvidersStatus() {
-  return {
-    openai: {
-      available: !!AI_CONFIG.openai.apiKey,
-      model: AI_CONFIG.openai.model,
-      keyName: "WHORKSHOP_OPENAI_API_KEY",
-    },
-    cohere: {
-      available: await isCohereAvailable(),
-      model: AI_CONFIG.cohere.model,
-    },
-    anthropic: {
-      available: await isAnthropicAvailable(),
-      model: AI_CONFIG.anthropic.model,
-    },
-    google: {
-      available: await isGeminiAvailable(),
-      model: AI_CONFIG.google.model,
-    },
-    grok: {
-      available: !!AI_CONFIG.grok.apiKey,
-      model: AI_CONFIG.grok.model,
-    },
-  }
-}
-
-// Función para generar texto con múltiples proveedores en paralelo (para comparación)
-export async function generateTextWithMultipleProviders(
-  prompt: string,
-  systemPrompt?: string,
-  providers: AIProvider[] = ["openai", "cohere", "anthropic"],
-  options?: {
-    model?: string
-    maxTokens?: number
-    temperature?: number
-  },
-): Promise<
-  Array<{
-    provider: AIProvider
-    text: string | null
-    error: string | null
-    duration: number
-  }>
-> {
-  const results = await Promise.allSettled(
-    providers.map(async (provider) => {
-      const startTime = Date.now()
-      try {
-        const result = await generateTextWithAI(prompt, systemPrompt, {
-          ...options,
-          provider,
-          fallbackProviders: [], // No usar fallbacks en comparación
-        })
-        return {
-          provider,
-          text: result.text,
-          error: null,
-          duration: Date.now() - startTime,
-        }
-      } catch (error: any) {
-        return {
-          provider,
-          text: null,
-          error: error.message,
-          duration: Date.now() - startTime,
-        }
-      }
-    }),
-  )
-
-  return results.map((result, index) => {
-    if (result.status === "fulfilled") {
-      return result.value
-    } else {
-      return {
-        provider: providers[index],
-        text: null,
-        error: result.reason?.message || "Error desconocido",
-        duration: 0,
-      }
-    }
-  })
 }

@@ -1,7 +1,7 @@
 "use server"
 
-import { generateCourseStructureWithAI } from "@/services/generate-text-with-ai"
-import type { CourseModule } from "@/types/course"
+import { generateCourseStructureWithAI, generateTextWithAI } from "@/services/generate-text-with-ai"
+import type { CourseData, CourseModule } from "@/types/course"
 
 export async function generateCourseStructure(courseData: any): Promise<CourseModule[] | { error: string }> {
   try {
@@ -80,46 +80,129 @@ export async function generateCourseStructure(courseData: any): Promise<CourseMo
   }
 }
 
-// Función para generar sugerencias de materiales
 export async function generateMaterialSuggestions(
-  courseData: any,
-  modules: CourseModule[],
-): Promise<string[] | { error: string }> {
+  courseData: Partial<CourseData>,
+  context: {
+    theoreticalContext: string
+    practicalContext: string
+  },
+): Promise<string> {
+  if (!courseData || !courseData.title) {
+    throw new Error("Se requiere al menos el título del curso para generar sugerencias de materiales")
+  }
+
   try {
-    console.log("🚀 Iniciando generación de sugerencias de materiales...")
+    console.log("Generating material suggestions for:", courseData.title)
+
+    const systemPrompt = `Eres un diseñador instruccional experto especializado en crear materiales educativos que conecten efectivamente la teoría con la práctica. Tu misión es diseñar una lista de materiales y recursos altamente relevantes para un curso específico.`
+
+    // Convertir estructura de módulos a string para el prompt
+    const structureText = Array.isArray(courseData.structure)
+      ? courseData.structure.map((module, index) => `${index + 1}. ${module.title}: ${module.description}`).join("\n")
+      : "No especificada"
 
     const prompt = `
-Basándote en la siguiente información del curso y sus módulos, sugiere materiales y recursos educativos:
+**INFORMACIÓN DEL CURSO:**
+- Título: "${courseData.title}"
+- Audiencia: "${courseData.audience || "estudiantes"}"
+- Problema que resuelve: "${courseData.problem || "No especificado"}"
+- Propósito: "${courseData.purpose || "No especificado"}"
 
-Curso: ${courseData.title}
-Audiencia: ${courseData.audience}
-Modalidad: ${courseData.modality}
-Duración: ${courseData.duration}
+**ESTRUCTURA DE MÓDULOS:**
+${structureText}
 
-Módulos:
-${modules.map((m) => `- ${m.title}: ${m.description}`).join("\n")}
+**ANÁLISIS DEL EXPERTO TEÓRICO:**
+"""
+${context.theoreticalContext}
+"""
 
-Genera una lista de 8-12 materiales y recursos específicos que serían útiles para este curso.
-Incluye diferentes tipos: presentaciones, documentos, videos, herramientas, plataformas, etc.
+**ANÁLISIS DEL EXPERTO PRÁCTICO:**
+"""
+${context.practicalContext}
+"""
 
-Responde con una lista simple, un elemento por línea, sin numeración.
+**TU TAREA:**
+Basándote en la SÍNTESIS de toda la información proporcionada, diseña una lista completa de materiales y recursos que:
+
+1. Conecten directamente la teoría académica con las aplicaciones prácticas
+2. Sean específicamente relevantes para los módulos listados en la estructura
+3. Faciliten la transición del conocimiento conceptual a la implementación real
+4. Incluyan diferentes tipos de recursos (didácticos, multimedia, herramientas, actividades)
+
+**REQUISITOS ESPECÍFICOS:**
+- Si la estructura tiene módulos definidos, sugiere 1-2 materiales específicos para al menos dos de esos módulos
+- Balancea materiales teóricos con materiales prácticos
+- Considera las necesidades específicas de la audiencia: "${courseData.audience || "estudiantes"}"
+
+Formato la respuesta como una lista con viñetas (usando guiones), un material por línea.
 `
 
-    const { generateSimpleText } = await import("@/services/generate-text-with-ai")
-    const response = await generateSimpleText(prompt, "Eres un experto en recursos educativos y diseño instruccional.")
+    // Usar el servicio unificado con preferencia por Cohere para sugerencias de materiales
+    const result = await generateTextWithAI(prompt, systemPrompt, {
+      provider: "cohere", // Preferir Cohere para sugerencias creativas
+      fallbackProviders: ["openai", "anthropic", "google"],
+      maxTokens: 1500,
+      temperature: 0.7,
+    })
 
-    // Procesar la respuesta para extraer la lista
-    const materials = response
-      .split("\n")
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0 && !line.startsWith("#"))
-      .slice(0, 12) // Limitar a 12 elementos
-
-    console.log("✅ Sugerencias de materiales generadas:", materials.length)
-    return materials
+    console.log(`Sugerencias de materiales generadas con ${result.provider}`)
+    return result.text
   } catch (error: any) {
-    console.error("❌ Error al generar sugerencias de materiales:", error)
-    return { error: `Error al generar sugerencias: ${error.message}` }
+    console.error("Error al generar sugerencias de materiales:", error)
+
+    // Provide fallback content in case of error
+    return `- Presentaciones digitales para cada módulo
+- Guías de ejercicios prácticos
+- Videos tutoriales complementarios
+- Lecturas recomendadas en formato PDF
+- Plantillas de trabajo para actividades
+- Cuestionarios de autoevaluación
+- Foros de discusión para cada tema
+- Estudios de caso relevantes`
+  }
+}
+
+export async function generateEvaluationMethod(courseData: CourseData): Promise<string | { error: string }> {
+  try {
+    const { title, theoreticalContext, practicalContext, structure } = courseData
+    if (!title) {
+      return { error: "Se requiere el título del curso para generar métodos de evaluación." }
+    }
+
+    // Convertir estructura de módulos a string para el prompt si existe
+    const structureText = Array.isArray(structure)
+      ? structure.map((module, index) => `${index + 1}. ${module.title}: ${module.description}`).join("\n")
+      : "No especificada"
+
+    const systemPrompt = `Eres un diseñador instruccional experto especializado en evaluación educativa. Tu tarea es diseñar métodos de evaluación para un curso específico.`
+
+    const prompt = `
+Diseña métodos de evaluación para un curso titulado "${title}".
+
+CONTEXTO DEL CURSO:
+- Contexto Teórico: ${theoreticalContext || "No proporcionado."}
+- Contexto Práctico: ${practicalContext || "No proporcionado."}
+- Estructura del Curso: 
+${structureText}
+
+Basándote en TODA la información anterior, genera una lista de métodos de evaluación variados y efectivos.
+Incluye una mezcla de evaluación formativa (para medir el progreso durante el curso) y sumativa (para medir el resultado final).
+Para cada método, describe brevemente cómo se implementaría y qué objetivo de aprendizaje específico evalúa.
+
+La salida debe ser en formato Markdown.
+`
+
+    const result = await generateTextWithAI(prompt, systemPrompt, {
+      provider: "openai",
+      fallbackProviders: ["cohere", "anthropic", "google"],
+      maxTokens: 800,
+      temperature: 0.7,
+    })
+
+    return result.text || "No se pudieron generar sugerencias."
+  } catch (error: any) {
+    console.error("Error generating evaluation methods:", error)
+    return { error: "No se pudo contactar al servicio de IA para generar sugerencias de evaluación." }
   }
 }
 

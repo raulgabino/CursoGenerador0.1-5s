@@ -1,127 +1,51 @@
-// Configuración centralizada para todos los servicios de IA
-import { openai } from "@ai-sdk/openai"
-
 export const AI_CONFIG = {
-  // OpenAI Configuration - USANDO NUEVA VARIABLE DE ENTORNO ESPECÍFICA
   openai: {
     apiKey: process.env.WHORKSHOP_OPENAI_API_KEY,
-    model: "gpt-4o-mini", // Modelo más económico y rápido
+    baseURL: "https://api.openai.com/v1",
+    models: {
+      gpt4: "gpt-4o",
+      gpt35: "gpt-3.5-turbo",
+      gpt4mini: "gpt-4o-mini",
+    },
   },
-
-  // Anthropic Claude Configuration
   anthropic: {
     apiKey: process.env.ANTHROPIC_API_KEY,
-    model: "claude-3-haiku-20240307", // Modelo más rápido y económico
-    maxTokens: 2000,
-    temperature: 0.7,
+    baseURL: "https://api.anthropic.com",
+    models: {
+      claude3: "claude-3-sonnet-20240229",
+      claude35: "claude-3-5-sonnet-20241022",
+    },
   },
-
-  // Google Gemini Configuration
   google: {
     apiKey: process.env.GOOGLE_API_KEY,
-    model: "gemini-1.5-flash", // Modelo más rápido y económico
-    maxTokens: 2000,
-    temperature: 0.7,
+    models: {
+      gemini: "gemini-1.5-pro",
+    },
   },
-
-  // Cohere Configuration
   cohere: {
     apiKey: process.env.COHERE_API_KEY,
-    model: "command-r-plus", // Modelo optimizado para texto
-    maxTokens: 2000,
-    temperature: 0.7,
+    models: {
+      command: "command-r-plus",
+    },
   },
+}
 
-  // Grok Configuration (ya existente)
-  grok: {
-    apiKey: process.env.GROK_API_KEY,
-    model: "grok-2-latest",
-    maxTokens: 200,
-    temperature: 0.8,
-  },
+export function validateAIConfig() {
+  const providers = []
 
-  // Configuraciones generales
-  general: {
-    timeout: 30000, // 30 segundos
-    retries: 2,
-    cacheEnabled: true,
-    cacheTTL: 1800000, // 30 minutos
-  },
-} as const
-
-// Cliente de OpenAI configurado
-export const openaiClient = openai({
-  apiKey: process.env.WHORKSHOP_OPENAI_API_KEY || "",
-})
-
-// Función para validar que todas las API keys estén configuradas
-export async function validateApiKeys() {
-  const missingKeys: string[] = []
-
-  if (!AI_CONFIG.openai.apiKey) {
-    missingKeys.push("WHORKSHOP_OPENAI_API_KEY")
-  }
-
-  if (!AI_CONFIG.anthropic.apiKey) {
-    missingKeys.push("ANTHROPIC_API_KEY")
-  }
-
-  if (!AI_CONFIG.google.apiKey) {
-    missingKeys.push("GOOGLE_API_KEY")
-  }
-
-  if (!AI_CONFIG.cohere.apiKey) {
-    missingKeys.push("COHERE_API_KEY")
-  }
-
-  if (!AI_CONFIG.grok.apiKey) {
-    missingKeys.push("GROK_API_KEY")
-  }
+  if (AI_CONFIG.openai.apiKey) providers.push("openai")
+  if (AI_CONFIG.anthropic.apiKey) providers.push("anthropic")
+  if (AI_CONFIG.google.apiKey) providers.push("google")
+  if (AI_CONFIG.cohere.apiKey) providers.push("cohere")
 
   return {
-    isValid: missingKeys.length === 0,
-    missingKeys,
-    availableProviders: {
-      openai: !!AI_CONFIG.openai.apiKey,
-      anthropic: !!AI_CONFIG.anthropic.apiKey,
-      google: !!AI_CONFIG.google.apiKey,
-      cohere: !!AI_CONFIG.cohere.apiKey,
-      grok: !!AI_CONFIG.grok.apiKey,
-    },
+    hasValidProviders: providers.length > 0,
+    availableProviders: providers,
+    missingKeys: [
+      !AI_CONFIG.openai.apiKey && "WHORKSHOP_OPENAI_API_KEY",
+      !AI_CONFIG.anthropic.apiKey && "ANTHROPIC_API_KEY",
+      !AI_CONFIG.google.apiKey && "GOOGLE_API_KEY",
+      !AI_CONFIG.cohere.apiKey && "COHERE_API_KEY",
+    ].filter(Boolean),
   }
-}
-
-// Validación de configuración
-export function validateAIConfig() {
-  if (!process.env.WHORKSHOP_OPENAI_API_KEY) {
-    throw new Error("WHORKSHOP_OPENAI_API_KEY no está configurada en las variables de entorno")
-  }
-
-  console.log("✅ Configuración de IA validada correctamente")
-  return true
-}
-
-// Configuración por defecto para generación de texto
-export const defaultGenerationConfig = {
-  temperature: 0.7,
-  maxTokens: 2000,
-  topP: 0.9,
-}
-
-// Tipos para los proveedores de IA
-export type AIProvider = "openai" | "anthropic" | "google" | "cohere" | "grok"
-
-// Función para obtener el proveedor preferido basado en disponibilidad
-export async function getPreferredProvider(
-  preferredOrder: AIProvider[] = ["openai", "cohere", "anthropic", "google"],
-): Promise<AIProvider | null> {
-  const validation = await validateApiKeys()
-
-  for (const provider of preferredOrder) {
-    if (validation.availableProviders[provider]) {
-      return provider
-    }
-  }
-
-  return null
 }
