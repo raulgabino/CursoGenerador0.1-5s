@@ -1,67 +1,82 @@
-import { generateTextWithAI } from "@/services/unified-ai-service"
-import type { CourseModule } from "@/types/course"
+import { generateTextWithAI as unifiedGenerateText } from "./unified-ai-service"
+import type { CourseData, CourseModule } from "@/types/course"
 
-// Función específica para generar estructura de curso
-export async function generateCourseStructureWithAI(courseData: any): Promise<CourseModule[]> {
-  const systemPrompt = `Eres un diseñador instruccional experto. Tu tarea es crear una estructura de módulos para un curso educativo.
+export async function generateTextWithAI(prompt: string, system?: string): Promise<string> {
+  const result = await unifiedGenerateText({
+    prompt,
+    system,
+    maxTokens: 4000,
+    temperature: 0.7,
+  })
 
-INSTRUCCIONES CRÍTICAS:
-1. Debes devolver ÚNICAMENTE un array JSON válido.
-2. NO incluyas texto adicional, explicaciones o formato markdown.
-3. El JSON debe ser parseable directamente.
-4. Cada módulo debe tener: id, title, description, duration, objectives, topics.`
+  if (!result.success) {
+    throw new Error(result.error || "Error al generar texto")
+  }
 
+  return result.data || ""
+}
+
+export async function generateSimpleText(prompt: string): Promise<string> {
+  return generateTextWithAI(prompt)
+}
+
+export async function generateCourseStructureWithAI(courseData: CourseData): Promise<CourseModule[]> {
   const prompt = `
-Crea una estructura de 4-6 módulos para un curso titulado "${courseData.title}".
+Genera una estructura de curso detallada basada en la siguiente información:
 
-Información del curso:
-- Audiencia: ${courseData.audience}
-- Problema que resuelve: ${courseData.problem}
-- Propósito: ${courseData.purpose}
-- Modalidad: ${courseData.modality || "No especificada"}
-- Duración: ${courseData.duration || "No especificada"}
+Título: ${courseData.title}
+Audiencia: ${courseData.audience || "No especificada"}
+Modalidad: ${courseData.modality || "No especificada"}
+Duración: ${courseData.duration || "No especificada"}
+Problema a resolver: ${courseData.problem || "No especificado"}
+Propósito: ${courseData.purpose || "No especificado"}
+Experiencia previa: ${courseData.experience || "No especificada"}
 
-Devuelve ÚNICAMENTE un array JSON con este formato exacto:
+Genera entre 4 y 8 módulos que cubran el tema de manera completa y progresiva.
+Para cada módulo incluye:
+- Un título claro y específico
+- Una descripción detallada de lo que se cubrirá
+- Duración estimada en horas
+- 3-5 objetivos de aprendizaje específicos
+- 4-6 temas principales a cubrir
+
+Responde ÚNICAMENTE con un JSON válido que contenga un array de objetos con esta estructura:
 [
   {
     "id": "modulo-1",
-    "title": "Título del módulo 1",
-    "description": "Descripción detallada del módulo 1",
+    "title": "Título del módulo",
+    "description": "Descripción detallada",
     "duration": "2 horas",
-    "objectives": ["Objetivo 1", "Objetivo 2"],
-    "topics": ["Tema 1", "Tema 2", "Tema 3"]
+    "objectives": ["Objetivo 1", "Objetivo 2", "Objetivo 3"],
+    "topics": ["Tema 1", "Tema 2", "Tema 3", "Tema 4"]
   }
 ]
+`
 
-IMPORTANTE: Responde SOLO con el JSON, sin texto adicional.`
+  const system = `Eres un experto en diseño instruccional. Tu tarea es crear estructuras de cursos educativos bien organizadas y pedagógicamente sólidas. Siempre respondes con JSON válido sin texto adicional.`
 
   try {
-    const result = await generateTextWithAI(prompt, systemPrompt, {
-      provider: "openai",
-      fallbackProviders: ["cohere", "anthropic", "google"],
-      maxTokens: 2000,
-      temperature: 0.3,
-    })
+    const response = await generateTextWithAI(prompt, system)
 
     // Limpiar la respuesta para extraer solo el JSON
-    let cleanedResponse = result.text.trim()
+    let cleanResponse = response.trim()
 
-    // Remover posibles bloques de código markdown
-    const jsonMatch = cleanedResponse.match(/```(?:json)?\s*([\s\S]*?)\s*```/)
-    if (jsonMatch) {
-      cleanedResponse = jsonMatch[1].trim()
+    // Buscar el inicio y fin del JSON
+    const jsonStart = cleanResponse.indexOf("[")
+    const jsonEnd = cleanResponse.lastIndexOf("]") + 1
+
+    if (jsonStart !== -1 && jsonEnd !== -1) {
+      cleanResponse = cleanResponse.substring(jsonStart, jsonEnd)
     }
 
-    // Intentar parsear el JSON
-    const modules = JSON.parse(cleanedResponse) as CourseModule[]
+    const modules = JSON.parse(cleanResponse)
 
-    // Validar que sea un array
     if (!Array.isArray(modules)) {
       throw new Error("La respuesta no es un array válido")
     }
 
     // Validar estructura de cada módulo
-    const validatedModules = modules.map((module, index) => ({
+    const validatedModules: CourseModule[] = modules.map((module, index) => ({
       id: module.id || `modulo-${index + 1}`,
       title: module.title || `Módulo ${index + 1}`,
       description: module.description || "Descripción del módulo",
@@ -71,63 +86,43 @@ IMPORTANTE: Responde SOLO con el JSON, sin texto adicional.`
     }))
 
     return validatedModules
-  } catch (error: any) {
-    console.error("Error parseando respuesta de IA:", error)
+  } catch (error) {
+    console.error("Error al generar estructura:", error)
 
-    // Fallback: crear estructura básica
+    // Estructura fallback
     return [
       {
         id: "modulo-1",
-        title: "Módulo 1: Introducción",
-        description: `Introducción a los conceptos fundamentales de ${courseData.title}`,
+        title: "Introducción y Fundamentos",
+        description: "Módulo introductorio que establece las bases del curso",
         duration: "2 horas",
-        objectives: ["Comprender los conceptos básicos", "Identificar los objetivos del curso"],
-        topics: ["Conceptos fundamentales", "Objetivos de aprendizaje", "Metodología"],
+        objectives: ["Comprender los conceptos básicos", "Establecer objetivos de aprendizaje"],
+        topics: ["Conceptos fundamentales", "Objetivos del curso", "Metodología"],
       },
       {
         id: "modulo-2",
-        title: "Módulo 2: Fundamentos",
-        description: `Desarrollo de los conocimientos básicos sobre ${courseData.title}`,
+        title: "Desarrollo Teórico",
+        description: "Desarrollo de los conceptos teóricos principales",
         duration: "3 horas",
-        objectives: ["Dominar los fundamentos teóricos", "Aplicar conceptos básicos"],
-        topics: ["Teoría fundamental", "Principios básicos", "Aplicaciones iniciales"],
+        objectives: ["Dominar la teoría", "Aplicar conceptos", "Analizar casos"],
+        topics: ["Marco teórico", "Principios clave", "Casos de estudio", "Análisis crítico"],
       },
       {
         id: "modulo-3",
-        title: "Módulo 3: Aplicación Práctica",
+        title: "Aplicación Práctica",
         description: "Aplicación práctica de los conocimientos adquiridos",
         duration: "4 horas",
-        objectives: ["Implementar soluciones prácticas", "Resolver problemas reales"],
-        topics: ["Casos de estudio", "Ejercicios prácticos", "Resolución de problemas"],
+        objectives: ["Implementar soluciones", "Resolver problemas", "Evaluar resultados"],
+        topics: ["Ejercicios prácticos", "Proyectos", "Resolución de problemas", "Evaluación"],
       },
       {
         id: "modulo-4",
-        title: "Módulo 4: Proyecto Final",
-        description: "Integración de todos los conocimientos en un proyecto final",
-        duration: "3 horas",
-        objectives: ["Integrar todos los conocimientos", "Demostrar competencias adquiridas"],
-        topics: ["Desarrollo de proyecto", "Presentación", "Evaluación final"],
+        title: "Síntesis y Evaluación",
+        description: "Integración de conocimientos y evaluación final",
+        duration: "2 horas",
+        objectives: ["Integrar conocimientos", "Demostrar competencias", "Planificar aplicación"],
+        topics: ["Síntesis", "Evaluación final", "Plan de acción", "Recursos adicionales"],
       },
     ]
   }
 }
-
-// Función para generar texto simple
-export async function generateSimpleText(prompt: string, systemPrompt?: string): Promise<string> {
-  try {
-    const result = await generateTextWithAI(prompt, systemPrompt, {
-      provider: "openai",
-      fallbackProviders: ["cohere", "anthropic", "google"],
-      maxTokens: 1000,
-      temperature: 0.7,
-    })
-
-    return result.text
-  } catch (error: any) {
-    console.error("Error generando texto simple:", error)
-    return "Error al generar contenido con IA"
-  }
-}
-
-// Re-exportar la función principal
-export { generateTextWithAI }

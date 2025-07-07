@@ -21,7 +21,7 @@ export default function CreateCoursePage() {
     problem: "",
     purpose: "",
     experience: "",
-    structure: [], // ✅ CRÍTICO: Asegurar que sea array vacío
+    structure: [], // ✅ CRÍTICO: Inicializar como array vacío
     evaluationMethod: "",
     evaluationType: "",
     materials: "",
@@ -35,22 +35,22 @@ export default function CreateCoursePage() {
   })
 
   const updateCourseData = (data: Partial<CourseData>) => {
-    console.log("🔍 DIAGNÓSTICO - Actualizando courseData:", data) // LOG DE DIAGNÓSTICO
+    console.log("🔄 Actualizando courseData:", data)
     setCourseData((prev) => {
       const updated = { ...prev, ...data }
-      console.log("🔍 DIAGNÓSTICO - courseData actualizado:", updated) // LOG DE DIAGNÓSTICO
+      console.log("📊 courseData actualizado:", updated)
       return updated
     })
   }
 
   const nextScreen = () => {
-    console.log("🔍 DIAGNÓSTICO - Avanzando a pantalla:", currentScreen + 1) // LOG DE DIAGNÓSTICO
-    console.log("🔍 DIAGNÓSTICO - courseData actual:", courseData) // LOG DE DIAGNÓSTICO
+    console.log("➡️ Avanzando a pantalla:", currentScreen + 1)
+    console.log("📋 courseData actual:", courseData)
     setCurrentScreen((prev) => prev + 1)
   }
 
   const prevScreen = () => {
-    console.log("🔍 DIAGNÓSTICO - Retrocediendo a pantalla:", currentScreen - 1) // LOG DE DIAGNÓSTICO
+    console.log("⬅️ Retrocediendo a pantalla:", currentScreen - 1)
     setCurrentScreen((prev) => prev - 1)
   }
 
@@ -59,9 +59,9 @@ export default function CreateCoursePage() {
     <ContentScreen
       key="content"
       courseData={courseData}
-      updateCourseData={updateCourseData} // ✅ Cambiar de onUpdate a updateCourseData
+      updateCourseData={updateCourseData} // ✅ Prop correcta
       onNext={nextScreen}
-      onPrev={prevScreen} // ✅ Cambiar de onBack a onPrev
+      onPrev={prevScreen} // ✅ Prop correcta
     />,
     <EvaluationScreen
       key="evaluation"
@@ -76,7 +76,7 @@ export default function CreateCoursePage() {
       updateCourseData={updateCourseData}
       onNext={nextScreen}
       onPrev={prevScreen}
-      setError={() => {}} // Añadir setError si es necesario
+      setError={() => {}}
     />,
     <FinalScreen key="final" courseData={courseData} onReset={() => setCurrentScreen(0)} />,
     <ResultsScreen key="results" courseData={courseData} onRestart={() => setCurrentScreen(0)} />,

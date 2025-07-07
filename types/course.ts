@@ -1,6 +1,10 @@
 export interface CourseModule {
-  moduleName: string
-  moduleDescription: string
+  id: string
+  title: string
+  description: string
+  duration: string
+  objectives: string[]
+  topics: string[]
 }
 
 export interface CourseData {
@@ -13,8 +17,8 @@ export interface CourseData {
   purpose?: string
   experience?: string
 
-  // CRÍTICO: Verificar que todos los componentes usen esta definición
-  structure?: CourseModule[] // NO string
+  // CRÍTICO: Asegurar que structure sea siempre CourseModule[]
+  structure: CourseModule[]
 
   evaluationMethod?: string
   evaluationType?: string

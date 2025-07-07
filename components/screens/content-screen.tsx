@@ -7,35 +7,40 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
-import { Sparkles, Plus, Trash2, Edit3, Save, X } from "lucide-react"
+import { Sparkles, Plus, Trash2, Edit3, Save, X, BookOpen, Loader2 } from "lucide-react"
 import { generateCourseStructure, generateMaterialSuggestions } from "@/app/actions/suggestion-actions"
 import type { CourseData, CourseModule } from "@/types/course"
 
 interface ContentScreenProps {
   courseData: CourseData
-  onUpdateCourseData: (data: Partial<CourseData>) => void
+  updateCourseData: (data: Partial<CourseData>) => void // ✅ Prop correcta
   onNext: () => void
-  onBack: () => void
+  onPrev: () => void // ✅ Prop correcta
 }
 
-export default function ContentScreen({ courseData, onUpdateCourseData, onNext, onBack }: ContentScreenProps) {
+export default function ContentScreen({ courseData, updateCourseData, onNext, onPrev }: ContentScreenProps) {
   const [modules, setModules] = useState<CourseModule[]>([])
   const [materials, setMaterials] = useState("")
   const [isGeneratingStructure, setIsGeneratingStructure] = useState(false)
   const [isGeneratingMaterials, setIsGeneratingMaterials] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
   const [editingModule, setEditingModule] = useState<string | null>(null)
   const [editingModuleData, setEditingModuleData] = useState<Partial<CourseModule>>({})
 
-  // Inicializar módulos desde courseData
+  // ✅ Inicializar módulos desde courseData.structure (que ahora es CourseModule[])
   useEffect(() => {
-    console.log("🔍 ContentScreen - courseData recibido:", courseData)
+    console.log("🔍 ContentScreen - Inicializando...")
+    console.log("📋 courseData recibido:", courseData)
+    console.log("🏗️ courseData.structure:", courseData.structure)
+    console.log("🏗️ Es array:", Array.isArray(courseData.structure))
 
-    if (courseData.structure && Array.isArray(courseData.structure)) {
-      console.log("✅ Inicializando módulos desde courseData.structure")
+    // ✅ courseData.structure ahora es siempre CourseModule[]
+    if (Array.isArray(courseData.structure)) {
+      console.log("✅ Inicializando con", courseData.structure.length, "módulos")
       setModules(courseData.structure)
     } else {
-      console.log("⚠️ courseData.structure no es un array válido, inicializando vacío")
+      console.log("⚠️ courseData.structure no es array, inicializando vacío")
       setModules([])
     }
 
@@ -46,16 +51,17 @@ export default function ContentScreen({ courseData, onUpdateCourseData, onNext, 
 
   // Actualizar courseData cuando cambien los módulos o materiales
   useEffect(() => {
-    onUpdateCourseData({
+    updateCourseData({
       structure: modules,
       materials: materials,
     })
-  }, [modules, materials, onUpdateCourseData])
+  }, [modules, materials, updateCourseData])
 
   const handleGenerateStructure = async () => {
     try {
       setIsGeneratingStructure(true)
       setError(null)
+      setSuccess(null)
 
       console.log("🚀 Iniciando generación de estructura...")
       console.log("📋 Datos del curso para IA:", courseData)
@@ -84,6 +90,7 @@ export default function ContentScreen({ courseData, onUpdateCourseData, onNext, 
         console.log("✅ Estructura generada exitosamente:", result.length, "módulos")
         setModules(result)
         setError(null)
+        setSuccess(`Se generaron ${result.length} módulos exitosamente`)
       } else {
         console.error("❌ Resultado no es un array:", result)
         setError("Formato de respuesta inválido del servicio de IA")
@@ -108,6 +115,7 @@ export default function ContentScreen({ courseData, onUpdateCourseData, onNext, 
 
       const result = await generateMaterialSuggestions(courseData, context)
       setMaterials(result)
+      setSuccess("Materiales generados exitosamente")
     } catch (error: any) {
       console.error("Error al generar materiales:", error)
       setError(`Error al generar materiales: ${error.message}`)
@@ -150,7 +158,19 @@ export default function ContentScreen({ courseData, onUpdateCourseData, onNext, 
     setEditingModuleData({})
   }
 
-  const canProceed = modules.length > 0
+  const handleNext = () => {
+    if (modules.length === 0) {
+      setError("Debes añadir al menos un módulo antes de continuar")
+      return
+    }
+
+    // Limpiar mensajes antes de continuar
+    setError(null)
+    setSuccess(null)
+
+    console.log("➡️ Avanzando al siguiente paso con", modules.length, "módulos")
+    onNext()
+  }
 
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-8">
@@ -161,9 +181,16 @@ export default function ContentScreen({ courseData, onUpdateCourseData, onNext, 
         </p>
       </div>
 
+      {/* Mensajes de error y éxito */}
       {error && (
         <Alert variant="destructive">
           <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {success && (
+        <Alert className="border-green-200 bg-green-50">
+          <AlertDescription className="text-green-700">{success}</AlertDescription>
         </Alert>
       )}
 
@@ -172,9 +199,17 @@ export default function ContentScreen({ courseData, onUpdateCourseData, onNext, 
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-xl text-blue-600">Estructura del curso</CardTitle>
           <div className="flex gap-2">
-            <Button onClick={handleGenerateStructure} disabled={isGeneratingStructure} variant="outline" size="sm">
-              <Sparkles className="w-4 h-4 mr-2" />
-              {isGeneratingStructure ? "Generando..." : "Generar con IA"}
+            <Button
+              onClick={handleGenerateStructure}
+              disabled={isGeneratingStructure}
+              className="bg-purple-600 hover:bg-purple-700"
+            >
+              {isGeneratingStructure ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Sparkles className="w-4 h-4 mr-2" />
+              )}
+              Generar con IA
             </Button>
             <Button onClick={handleAddModule} variant="outline" size="sm">
               <Plus className="w-4 h-4 mr-2" />
@@ -185,9 +220,7 @@ export default function ContentScreen({ courseData, onUpdateCourseData, onNext, 
         <CardContent>
           {modules.length === 0 ? (
             <div className="text-center py-12 border-2 border-dashed border-gray-200 rounded-lg">
-              <div className="text-gray-400 mb-4">
-                <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-lg flex items-center justify-center">📚</div>
-              </div>
+              <BookOpen className="w-12 h-12 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">No hay módulos definidos</h3>
               <p className="text-gray-500 mb-6">
                 Comienza añadiendo módulos manualmente o genera una estructura automáticamente con IA
@@ -196,10 +229,14 @@ export default function ContentScreen({ courseData, onUpdateCourseData, onNext, 
                 <Button
                   onClick={handleGenerateStructure}
                   disabled={isGeneratingStructure}
-                  className="bg-black text-white hover:bg-gray-800"
+                  className="bg-purple-600 hover:bg-purple-700"
                 >
-                  <Sparkles className="w-4 h-4 mr-2" />
-                  {isGeneratingStructure ? "Generando..." : "Generar estructura con IA"}
+                  {isGeneratingStructure ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Sparkles className="w-4 h-4 mr-2" />
+                  )}
+                  Generar estructura con IA
                 </Button>
                 <Button onClick={handleAddModule} variant="outline">
                   <Plus className="w-4 h-4 mr-2" />
@@ -300,9 +337,17 @@ export default function ContentScreen({ courseData, onUpdateCourseData, onNext, 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-xl text-blue-600">Materiales y recursos</CardTitle>
-          <Button onClick={handleGenerateMaterials} disabled={isGeneratingMaterials} variant="outline" size="sm">
-            <Sparkles className="w-4 h-4 mr-2" />
-            {isGeneratingMaterials ? "Generando..." : "Sugerir con IA"}
+          <Button
+            onClick={handleGenerateMaterials}
+            disabled={isGeneratingMaterials || modules.length === 0}
+            variant="outline"
+          >
+            {isGeneratingMaterials ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Sparkles className="w-4 h-4 mr-2" />
+            )}
+            Sugerir con IA
           </Button>
         </CardHeader>
         <CardContent>
@@ -323,10 +368,10 @@ Incluye presentaciones, documentos, videos, herramientas, plataformas, etc."
 
       {/* Navegación */}
       <div className="flex justify-between">
-        <Button onClick={onBack} variant="outline">
+        <Button onClick={onPrev} variant="outline">
           Anterior
         </Button>
-        <Button onClick={onNext} disabled={!canProceed} className="bg-blue-600 hover:bg-blue-700">
+        <Button onClick={handleNext} disabled={modules.length === 0} className="bg-blue-600 hover:bg-blue-700">
           Continuar
         </Button>
       </div>
