@@ -2,25 +2,23 @@
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, BookOpen, Plus, Trash2, Edit2, Check, X, Sparkles } from "lucide-react"
-import { motion } from "framer-motion"
-import type { CourseData, CourseModule } from "@/types/course"
+import { Sparkles, Plus, Trash2, AlertCircle } from "lucide-react"
 import { generateCourseStructure, generateMaterialSuggestions } from "@/app/actions/suggestion-actions"
-import { getExpertContextForCourse } from "@/app/actions/context-actions"
+import type { CourseData, CourseModule } from "@/types/course"
 
 interface ContentScreenProps {
   courseData: CourseData
-  updateCourseData: (data: Partial<CourseData>) => void
+  onUpdate: (data: Partial<CourseData>) => void
   onNext: () => void
-  onPrev: () => void
+  onBack: () => void
 }
 
-export default function ContentScreen({ courseData, updateCourseData, onNext, onPrev }: ContentScreenProps) {
-  // Inicializar modules con un array vacío si structure no existe o no es un array
+export default function ContentScreen({ courseData, onUpdate, onNext, onBack }: ContentScreenProps) {
+  // Inicializar modules con verificación de tipo segura
   const [modules, setModules] = useState<CourseModule[]>(() => {
     if (Array.isArray(courseData.structure)) {
       return courseData.structure
@@ -28,138 +26,84 @@ export default function ContentScreen({ courseData, updateCourseData, onNext, on
     return []
   })
 
-  const [materials, setMaterials] = useState<string>(courseData.materials || "")
+  const [materials, setMaterials] = useState(courseData.materials || "")
   const [isGeneratingStructure, setIsGeneratingStructure] = useState(false)
   const [isGeneratingMaterials, setIsGeneratingMaterials] = useState(false)
-  const [editingModule, setEditingModule] = useState<number | null>(null)
-  const [editName, setEditName] = useState("")
-  const [editDescription, setEditDescription] = useState("")
-  const [error, setError] = useState<string | null>(null)
+  const [structureError, setStructureError] = useState<string | null>(null)
+  const [materialsError, setMaterialsError] = useState<string | null>(null)
 
-  // Auto-save modules to courseData when they change
+  // Actualizar courseData cuando cambien los módulos o materiales
   useEffect(() => {
-    console.log("🔍 DIAGNÓSTICO - ContentScreen actualizando structure:", modules)
-    updateCourseData({ structure: modules })
-  }, [modules, updateCourseData])
-
-  // Auto-save materials to courseData when they change
-  useEffect(() => {
-    updateCourseData({ materials })
-  }, [materials, updateCourseData])
+    onUpdate({
+      structure: modules,
+      materials: materials,
+    })
+  }, [modules, materials, onUpdate])
 
   const handleGenerateStructure = async () => {
-    if (!courseData.title) {
-      setError("Se requiere un título del curso para generar la estructura")
-      return
-    }
-
+    console.log("🔍 DIAGNÓSTICO - Iniciando generación de estructura...")
     setIsGeneratingStructure(true)
-    setError(null)
+    setStructureError(null)
 
     try {
-      console.log("🔍 DIAGNÓSTICO - Generando estructura para:", courseData.title)
-
-      // Primero obtener el contexto de los expertos
-      let theoreticalContext = ""
-      let practicalContext = ""
-
-      try {
-        const expertContext = await getExpertContextForCourse(courseData)
-        theoreticalContext = expertContext.theoreticalContext
-        practicalContext = expertContext.practicalContext
-
-        // Actualizar courseData con el contexto
-        updateCourseData({
-          theoreticalContext,
-          practicalContext,
-        })
-      } catch (contextError) {
-        console.warn("No se pudo obtener contexto de expertos, continuando sin él:", contextError)
-      }
-
-      // Generar estructura con el contexto disponible
-      const structureResult = await generateCourseStructure({
-        ...courseData,
-        theoreticalContext,
-        practicalContext,
+      console.log("🔍 DIAGNÓSTICO - Datos del curso:", {
+        title: courseData.title,
+        hasTheoreticalContext: !!courseData.theoreticalContext,
+        hasPracticalContext: !!courseData.practicalContext,
       })
 
-      console.log("🔍 DIAGNÓSTICO - Resultado de generateCourseStructure:", structureResult)
+      const structureResult = await generateCourseStructure(courseData)
 
-      // Verificar el tipo de resultado de manera más robusta
+      console.log("🔍 DIAGNÓSTICO - Resultado recibido:", {
+        type: typeof structureResult,
+        isArray: Array.isArray(structureResult),
+        hasError: structureResult && typeof structureResult === "object" && "error" in structureResult,
+        result: structureResult,
+      })
+
+      // Verificación robusta del tipo de resultado
       if (!structureResult) {
-        console.error("🔍 DIAGNÓSTICO - structureResult es undefined o null")
-        setError("No se recibió respuesta del servicio de IA")
+        console.error("🔍 DIAGNÓSTICO - structureResult es null/undefined")
+        setStructureError("No se recibió respuesta del servicio de IA")
         return
       }
 
-      // Verificar si es un array (éxito)
       if (Array.isArray(structureResult)) {
-        console.log("🔍 DIAGNÓSTICO - Estructura generada exitosamente:", structureResult)
+        console.log("🔍 DIAGNÓSTICO - Estructura generada exitosamente:", structureResult.length, "módulos")
         setModules(structureResult)
-        setError(null)
-      }
-      // Verificar si es un objeto con error
-      else if (typeof structureResult === "object" && structureResult !== null && "error" in structureResult) {
-        console.error("🔍 DIAGNÓSTICO - Error en structureResult:", structureResult.error)
-        setError(structureResult.error)
-      }
-      // Caso inesperado
-      else {
-        console.error(
-          "🔍 DIAGNÓSTICO - Formato inesperado de structureResult:",
-          typeof structureResult,
-          structureResult,
-        )
-        setError("Formato de respuesta inesperado del servicio de IA")
+        setStructureError(null)
+      } else if (typeof structureResult === "object" && "error" in structureResult) {
+        console.error("🔍 DIAGNÓSTICO - Error en la respuesta:", structureResult.error)
+        setStructureError(structureResult.error)
+      } else {
+        console.error("🔍 DIAGNÓSTICO - Formato de respuesta inesperado:", structureResult)
+        setStructureError("Formato de respuesta inesperado del servicio de IA")
       }
     } catch (error: any) {
       console.error("🔍 DIAGNÓSTICO - Error en handleGenerateStructure:", error)
       const errorMessage = error?.message || error?.toString() || "Error desconocido"
-      setError(`Error al generar estructura: ${errorMessage}`)
+      setStructureError(`Error al generar estructura: ${errorMessage}`)
     } finally {
       setIsGeneratingStructure(false)
     }
   }
 
   const handleGenerateMaterials = async () => {
-    if (!courseData.title) {
-      setError("Se requiere un título del curso para generar materiales")
-      return
-    }
-
     setIsGeneratingMaterials(true)
-    setError(null)
+    setMaterialsError(null)
 
     try {
-      // Usar el contexto existente o generar uno nuevo si no existe
-      let theoreticalContext = courseData.theoreticalContext || ""
-      let practicalContext = courseData.practicalContext || ""
+      const suggestions = await generateMaterialSuggestions(courseData, {
+        theoreticalContext: courseData.theoreticalContext || "",
+        practicalContext: courseData.practicalContext || "",
+      })
 
-      if (!theoreticalContext || !practicalContext) {
-        try {
-          const expertContext = await getExpertContextForCourse(courseData)
-          theoreticalContext = expertContext.theoreticalContext
-          practicalContext = expertContext.practicalContext
-
-          updateCourseData({
-            theoreticalContext,
-            practicalContext,
-          })
-        } catch (contextError) {
-          console.warn("No se pudo obtener contexto de expertos para materiales:", contextError)
-        }
-      }
-
-      const materialsResult = await generateMaterialSuggestions(
-        { ...courseData, structure: modules },
-        { theoreticalContext, practicalContext },
-      )
-
-      setMaterials(materialsResult)
+      setMaterials(suggestions)
+      setMaterialsError(null)
     } catch (error: any) {
-      console.error("Error generando materiales:", error)
-      setError(`Error al generar materiales: ${error.message || "Error desconocido"}`)
+      console.error("Error generating materials:", error)
+      const errorMessage = error?.message || error?.toString() || "Error desconocido"
+      setMaterialsError(`Error al generar materiales: ${errorMessage}`)
     } finally {
       setIsGeneratingMaterials(false)
     }
@@ -167,263 +111,186 @@ export default function ContentScreen({ courseData, updateCourseData, onNext, on
 
   const addModule = () => {
     const newModule: CourseModule = {
-      moduleName: `Módulo ${modules.length + 1}`,
-      moduleDescription: "Descripción del módulo...",
+      moduleName: "",
+      moduleDescription: "",
     }
     setModules([...modules, newModule])
+  }
+
+  const updateModule = (index: number, field: keyof CourseModule, value: string) => {
+    const updatedModules = modules.map((module, i) => (i === index ? { ...module, [field]: value } : module))
+    setModules(updatedModules)
   }
 
   const removeModule = (index: number) => {
     setModules(modules.filter((_, i) => i !== index))
   }
 
-  const startEditing = (index: number) => {
-    setEditingModule(index)
-    setEditName(modules[index].moduleName)
-    setEditDescription(modules[index].moduleDescription)
-  }
-
-  const saveEdit = () => {
-    if (editingModule !== null) {
-      const updatedModules = [...modules]
-      updatedModules[editingModule] = {
-        moduleName: editName,
-        moduleDescription: editDescription,
-      }
-      setModules(updatedModules)
-      setEditingModule(null)
-      setEditName("")
-      setEditDescription("")
-    }
-  }
-
-  const cancelEdit = () => {
-    setEditingModule(null)
-    setEditName("")
-    setEditDescription("")
-  }
-
-  const validateForm = () => {
-    if (modules.length === 0) {
-      setError("Debes tener al menos un módulo en tu curso")
-      return false
-    }
-
-    for (const module of modules) {
-      if (!module.moduleName.trim() || !module.moduleDescription.trim()) {
-        setError("Todos los módulos deben tener nombre y descripción")
-        return false
-      }
-    }
-
-    setError(null)
-    return true
-  }
-
-  const handleNext = () => {
-    console.log("🔍 DIAGNÓSTICO - ContentScreen handleNext llamado")
-    console.log("🔍 DIAGNÓSTICO - modules:", modules)
-
-    if (validateForm()) {
-      console.log("🔍 DIAGNÓSTICO - Validación exitosa, llamando onNext")
-      onNext()
-    }
-  }
+  const canProceed =
+    modules.length > 0 &&
+    modules.every((module) => module.moduleName.trim() !== "" && module.moduleDescription.trim() !== "")
 
   return (
-    <motion.div
-      initial={{ opacity: 0, x: 100 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: -100 }}
-      transition={{ duration: 0.3 }}
-      className="py-6"
-    >
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-blue-800 mb-2">Paso 2: Organiza el contenido</h2>
+    <div className="space-y-8">
+      <div>
+        <h2 className="text-2xl font-bold text-blue-600 mb-2">Paso 2: Organiza el contenido</h2>
         <p className="text-gray-600">
           Define la estructura de módulos de tu curso y los materiales necesarios para cada uno.
         </p>
       </div>
 
-      {error && (
-        <Alert variant="destructive" className="mb-6">
-          <AlertDescription>{error}</AlertDescription>
+      {/* Error de estructura */}
+      {structureError && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{structureError}</AlertDescription>
         </Alert>
       )}
 
-      {/* Course Structure Section */}
-      <div className="space-y-6">
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xl font-semibold text-blue-700">Estructura del curso</h3>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleGenerateStructure}
-                disabled={isGeneratingStructure || !courseData.title}
-                className="bg-transparent"
-              >
-                {isGeneratingStructure ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Generando...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="h-4 w-4 mr-2" />
-                    Generar con IA
-                  </>
-                )}
-              </Button>
-              <Button onClick={addModule} variant="outline" size="sm">
-                <Plus className="h-4 w-4 mr-2" />
-                Añadir módulo
-              </Button>
-            </div>
+      {/* Estructura del curso */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-blue-600">Estructura del curso</CardTitle>
+          <div className="flex gap-2">
+            <Button
+              onClick={handleGenerateStructure}
+              disabled={isGeneratingStructure || !courseData.title}
+              variant="outline"
+              size="sm"
+            >
+              <Sparkles className="w-4 h-4 mr-2" />
+              {isGeneratingStructure ? "Generando..." : "Generar con IA"}
+            </Button>
+            <Button onClick={addModule} variant="outline" size="sm">
+              <Plus className="w-4 h-4 mr-2" />
+              Añadir módulo
+            </Button>
           </div>
-
+        </CardHeader>
+        <CardContent>
           {modules.length === 0 ? (
-            <Card className="border-dashed border-2 border-gray-300">
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <BookOpen className="h-12 w-12 text-gray-400 mb-4" />
-                <h3 className="text-lg font-semibold text-gray-600 mb-2">No hay módulos definidos</h3>
-                <p className="text-gray-500 text-center mb-4">
-                  Comienza añadiendo módulos manualmente o genera una estructura automáticamente con IA
-                </p>
-                <div className="flex gap-2">
-                  <Button onClick={handleGenerateStructure} disabled={isGeneratingStructure || !courseData.title}>
-                    {isGeneratingStructure ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Generando estructura...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="h-4 w-4 mr-2" />
-                        Generar estructura con IA
-                      </>
-                    )}
-                  </Button>
-                  <Button onClick={addModule} variant="outline">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Añadir módulo manualmente
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+            <div className="text-center py-12 border-2 border-dashed border-gray-200 rounded-lg">
+              <div className="text-gray-400 mb-4">
+                <svg
+                  className="mx-auto h-12 w-12"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+                  />
+                </svg>
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No hay módulos definidos</h3>
+              <p className="text-gray-500 mb-6">
+                Comienza añadiendo módulos manualmente o genera una estructura automáticamente con IA
+              </p>
+              <div className="flex justify-center gap-4">
+                <Button
+                  onClick={handleGenerateStructure}
+                  disabled={isGeneratingStructure || !courseData.title}
+                  variant="default"
+                >
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  {isGeneratingStructure ? "Generando..." : "Generar estructura con IA"}
+                </Button>
+                <Button onClick={addModule} variant="outline">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Añadir módulo manualmente
+                </Button>
+              </div>
+            </div>
           ) : (
             <div className="space-y-4">
               {modules.map((module, index) => (
-                <Card key={index} className="w-full">
-                  <CardHeader>
-                    <div className="flex items-start justify-between gap-4">
-                      {editingModule === index ? (
-                        <div className="flex-1 space-y-3">
-                          <div>
-                            <label className="text-sm font-medium text-gray-700 mb-1 block">Nombre del módulo</label>
-                            <Input
-                              value={editName}
-                              onChange={(e) => setEditName(e.target.value)}
-                              placeholder="Nombre del módulo"
-                              className="font-semibold"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-sm font-medium text-gray-700 mb-1 block">
-                              Descripción del módulo
-                            </label>
-                            <Textarea
-                              value={editDescription}
-                              onChange={(e) => setEditDescription(e.target.value)}
-                              placeholder="Descripción detallada del módulo"
-                              rows={3}
-                            />
-                          </div>
-                          <div className="flex gap-2">
-                            <Button onClick={saveEdit} size="sm" variant="default">
-                              <Check className="h-4 w-4 mr-1" />
-                              Guardar
-                            </Button>
-                            <Button onClick={cancelEdit} size="sm" variant="outline">
-                              <X className="h-4 w-4 mr-1" />
-                              Cancelar
-                            </Button>
-                          </div>
-                        </div>
-                      ) : (
-                        <>
-                          <div className="flex-1">
-                            <CardTitle className="text-lg text-blue-800">{module.moduleName}</CardTitle>
-                            <p className="text-sm text-gray-600 mt-2 leading-relaxed">{module.moduleDescription}</p>
-                          </div>
-                          <div className="flex gap-2">
-                            <Button onClick={() => startEditing(index)} size="sm" variant="outline">
-                              <Edit2 className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              onClick={() => removeModule(index)}
-                              size="sm"
-                              variant="outline"
-                              className="text-red-600 hover:text-red-700"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </>
-                      )}
+                <div key={index} className="border rounded-lg p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium text-gray-900">Módulo {index + 1}</h4>
+                    <Button
+                      onClick={() => removeModule(index)}
+                      variant="ghost"
+                      size="sm"
+                      className="text-red-600 hover:text-red-700"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Nombre del módulo</label>
+                      <Input
+                        value={module.moduleName}
+                        onChange={(e) => updateModule(index, "moduleName", e.target.value)}
+                        placeholder="Ej: Introducción a los conceptos básicos"
+                      />
                     </div>
-                  </CardHeader>
-                </Card>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Descripción del módulo</label>
+                      <Textarea
+                        value={module.moduleDescription}
+                        onChange={(e) => updateModule(index, "moduleDescription", e.target.value)}
+                        placeholder="Describe qué aprenderán los estudiantes en este módulo..."
+                        rows={3}
+                      />
+                    </div>
+                  </div>
+                </div>
               ))}
             </div>
           )}
-        </div>
+        </CardContent>
+      </Card>
 
-        {/* Materials Section */}
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xl font-semibold text-blue-700">Materiales y recursos</h3>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleGenerateMaterials}
-              disabled={isGeneratingMaterials || !courseData.title}
-              className="bg-transparent"
-            >
-              {isGeneratingMaterials ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Generando...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="h-4 w-4 mr-2" />
-                  Sugerir con IA
-                </>
-              )}
-            </Button>
-          </div>
+      {/* Error de materiales */}
+      {materialsError && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{materialsError}</AlertDescription>
+        </Alert>
+      )}
 
+      {/* Materiales y recursos */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-blue-600">Materiales y recursos</CardTitle>
+          <Button
+            onClick={handleGenerateMaterials}
+            disabled={isGeneratingMaterials || !courseData.title}
+            variant="outline"
+            size="sm"
+          >
+            <Sparkles className="w-4 h-4 mr-2" />
+            {isGeneratingMaterials ? "Generando..." : "Sugerir con IA"}
+          </Button>
+        </CardHeader>
+        <CardContent>
           <Textarea
             value={materials}
             onChange={(e) => setMaterials(e.target.value)}
             placeholder="Lista los materiales, recursos y herramientas necesarios para el curso..."
-            rows={6}
+            rows={8}
             className="w-full"
           />
           <p className="text-sm text-gray-500 mt-2">
             Incluye presentaciones, documentos, videos, herramientas, plataformas, etc.
           </p>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
-      <div className="flex justify-between mt-8">
-        <Button variant="outline" onClick={onPrev}>
-          Atrás
+      {/* Navegación */}
+      <div className="flex justify-between">
+        <Button onClick={onBack} variant="outline">
+          Anterior
         </Button>
-        <Button onClick={handleNext}>Continuar</Button>
+        <Button onClick={onNext} disabled={!canProceed}>
+          Continuar
+        </Button>
       </div>
-    </motion.div>
+    </div>
   )
 }

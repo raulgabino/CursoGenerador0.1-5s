@@ -1,8 +1,8 @@
 // Configuración centralizada para todas las APIs de IA
 export const AI_CONFIG = {
-  // OpenAI Configuration
+  // OpenAI Configuration - USANDO NUEVA VARIABLE DE ENTORNO ESPECÍFICA
   openai: {
-    apiKey: process.env.OPENAI_API_KEY,
+    apiKey: process.env.WHORKSHOP_OPENAI_API_KEY,
     model: "gpt-4o-mini",
     maxTokens: 2000,
     temperature: 0.7,
@@ -54,7 +54,7 @@ export async function validateApiKeys() {
   const missingKeys: string[] = []
 
   if (!AI_CONFIG.openai.apiKey) {
-    missingKeys.push("OPENAI_API_KEY")
+    missingKeys.push("WHORKSHOP_OPENAI_API_KEY")
   }
 
   if (!AI_CONFIG.anthropic.apiKey) {

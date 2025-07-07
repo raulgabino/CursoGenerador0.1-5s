@@ -12,9 +12,11 @@ let openaiClient: OpenAI | null = null
 async function getOpenAIClient(): Promise<OpenAI> {
   if (!openaiClient) {
     if (!AI_CONFIG.openai.apiKey) {
-      throw new Error("OPENAI_API_KEY no está configurada")
+      console.error("🔍 DIAGNÓSTICO - WHORKSHOP_OPENAI_API_KEY no está configurada")
+      throw new Error("WHORKSHOP_OPENAI_API_KEY no está configurada")
     }
 
+    console.log("🔍 DIAGNÓSTICO - Creando cliente OpenAI con nueva API key...")
     openaiClient = new OpenAI({
       apiKey: AI_CONFIG.openai.apiKey,
     })
@@ -34,6 +36,7 @@ async function generateTextWithOpenAI(
   },
 ): Promise<string> {
   try {
+    console.log("🔍 DIAGNÓSTICO - Iniciando generateTextWithOpenAI...")
     const client = await getOpenAIClient()
 
     const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = []
@@ -50,6 +53,7 @@ async function generateTextWithOpenAI(
       content: prompt,
     })
 
+    console.log("🔍 DIAGNÓSTICO - Enviando request a OpenAI...")
     const response = await client.chat.completions.create({
       model: options?.model || AI_CONFIG.openai.model,
       messages,
@@ -60,13 +64,23 @@ async function generateTextWithOpenAI(
     const content = response.choices[0]?.message?.content
 
     if (!content) {
+      console.error("🔍 DIAGNÓSTICO - No se recibió contenido de OpenAI")
       throw new Error("No se recibió contenido de OpenAI")
     }
 
+    console.log("🔍 DIAGNÓSTICO - Respuesta exitosa de OpenAI, longitud:", content.length)
     return content
   } catch (error: any) {
-    console.error("Error al generar texto con OpenAI:", error)
-    throw new Error(`Error de OpenAI: ${error.message || "Error desconocido"}`)
+    console.error("🔍 DIAGNÓSTICO - Error al generar texto con OpenAI:", error)
+
+    // Proporcionar más detalles sobre el error
+    if (error.code === "invalid_api_key") {
+      throw new Error(`Error de OpenAI: API key inválida. Verifica WHORKSHOP_OPENAI_API_KEY`)
+    } else if (error.code === "insufficient_quota") {
+      throw new Error(`Error de OpenAI: Cuota insuficiente. Verifica el saldo de la cuenta`)
+    } else {
+      throw new Error(`Error de OpenAI: ${error.message || "Error desconocido"}`)
+    }
   }
 }
 
@@ -107,13 +121,16 @@ export async function generateTextWithAI(
 
   for (const provider of providersToTry) {
     try {
-      console.log(`Intentando generar texto con ${provider}...`)
+      console.log(`🔍 DIAGNÓSTICO - Intentando generar texto con ${provider}...`)
 
       let text: string
 
       switch (provider) {
         case "openai":
-          if (!AI_CONFIG.openai.apiKey) continue
+          if (!AI_CONFIG.openai.apiKey) {
+            console.log("🔍 DIAGNÓSTICO - WHORKSHOP_OPENAI_API_KEY no disponible, saltando OpenAI")
+            continue
+          }
           text = await generateTextWithOpenAI(prompt, systemPrompt, options)
           break
 
@@ -147,14 +164,14 @@ export async function generateTextWithAI(
           continue
       }
 
-      console.log(`Texto generado exitosamente con ${provider}`)
+      console.log(`🔍 DIAGNÓSTICO - Texto generado exitosamente con ${provider}`)
       return {
         text,
         provider,
         success: true,
       }
     } catch (error: any) {
-      console.error(`Error con ${provider}:`, error.message)
+      console.error(`🔍 DIAGNÓSTICO - Error con ${provider}:`, error.message)
       lastError = error
       continue
     }
@@ -170,6 +187,7 @@ export async function getAIProvidersStatus() {
     openai: {
       available: !!AI_CONFIG.openai.apiKey,
       model: AI_CONFIG.openai.model,
+      keyName: "WHORKSHOP_OPENAI_API_KEY",
     },
     cohere: {
       available: await isCohereAvailable(),

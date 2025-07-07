@@ -1,11 +1,26 @@
 "use server"
 
 import { generateTextWithAI } from "@/services/unified-ai-service"
+import { AI_CONFIG } from "@/lib/ai-config"
 import type { CourseData, CourseModule } from "@/types/course"
+import OpenAI from "openai"
+
+// Cliente OpenAI usando la nueva variable de entorno
+async function getOpenAIClient(): Promise<OpenAI> {
+  if (!AI_CONFIG.openai.apiKey) {
+    console.error("🔍 DIAGNÓSTICO - WHORKSHOP_OPENAI_API_KEY no está configurada")
+    throw new Error("WHORKSHOP_OPENAI_API_KEY no está configurada")
+  }
+
+  return new OpenAI({
+    apiKey: AI_CONFIG.openai.apiKey,
+  })
+}
 
 export async function generateCourseStructure(courseData: CourseData): Promise<CourseModule[] | { error: string }> {
   try {
     console.log("🔍 DIAGNÓSTICO - generateCourseStructure iniciado con:", courseData.title)
+    console.log("🔍 DIAGNÓSTICO - API Key disponible:", !!AI_CONFIG.openai.apiKey)
 
     const { title, theoreticalContext, practicalContext } = courseData
     if (!title) {
