@@ -1,11 +1,11 @@
-// Configuración centralizada para todas las APIs de IA
+// Configuración centralizada para todos los servicios de IA
+import { openai } from "@ai-sdk/openai"
+
 export const AI_CONFIG = {
   // OpenAI Configuration - USANDO NUEVA VARIABLE DE ENTORNO ESPECÍFICA
   openai: {
     apiKey: process.env.WHORKSHOP_OPENAI_API_KEY,
-    model: "gpt-4o-mini",
-    maxTokens: 2000,
-    temperature: 0.7,
+    model: "gpt-4o-mini", // Modelo más económico y rápido
   },
 
   // Anthropic Claude Configuration
@@ -49,6 +49,11 @@ export const AI_CONFIG = {
   },
 } as const
 
+// Cliente de OpenAI configurado
+export const openaiClient = openai({
+  apiKey: process.env.WHORKSHOP_OPENAI_API_KEY || "",
+})
+
 // Función para validar que todas las API keys estén configuradas
 export async function validateApiKeys() {
   const missingKeys: string[] = []
@@ -84,6 +89,23 @@ export async function validateApiKeys() {
       grok: !!AI_CONFIG.grok.apiKey,
     },
   }
+}
+
+// Validación de configuración
+export function validateAIConfig() {
+  if (!process.env.WHORKSHOP_OPENAI_API_KEY) {
+    throw new Error("WHORKSHOP_OPENAI_API_KEY no está configurada en las variables de entorno")
+  }
+
+  console.log("✅ Configuración de IA validada correctamente")
+  return true
+}
+
+// Configuración por defecto para generación de texto
+export const defaultGenerationConfig = {
+  temperature: 0.7,
+  maxTokens: 2000,
+  topP: 0.9,
 }
 
 // Tipos para los proveedores de IA
