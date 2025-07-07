@@ -67,3 +67,25 @@ export async function generateTextWithAI(
 
   throw new Error("Todos los proveedores de IA fallaron o no están configurados.")
 }
+
+export async function getAIProvidersStatus() {
+  return {
+    providers: {
+      openai: {
+        available: isProviderAvailable("openai"),
+        model: AI_CONFIG.openai.model,
+        configured: !!AI_CONFIG.openai.apiKey,
+      },
+      google: {
+        available: isProviderAvailable("google"),
+        model: AI_CONFIG.google.model,
+        configured: !!AI_CONFIG.google.apiKey,
+      },
+      cohere: {
+        available: isProviderAvailable("cohere"),
+        model: AI_CONFIG.cohere.model,
+        configured: !!AI_CONFIG.cohere.apiKey,
+      },
+    },
+  }
+}
