@@ -84,15 +84,39 @@ export default function ContentScreen({ courseData, updateCourseData, onNext, on
         practicalContext,
       })
 
+      console.log("🔍 DIAGNÓSTICO - Resultado de generateCourseStructure:", structureResult)
+
+      // Verificar el tipo de resultado de manera más robusta
+      if (!structureResult) {
+        console.error("🔍 DIAGNÓSTICO - structureResult es undefined o null")
+        setError("No se recibió respuesta del servicio de IA")
+        return
+      }
+
+      // Verificar si es un array (éxito)
       if (Array.isArray(structureResult)) {
-        console.log("🔍 DIAGNÓSTICO - Estructura generada:", structureResult)
+        console.log("🔍 DIAGNÓSTICO - Estructura generada exitosamente:", structureResult)
         setModules(structureResult)
-      } else if (structureResult.error) {
+        setError(null)
+      }
+      // Verificar si es un objeto con error
+      else if (typeof structureResult === "object" && structureResult !== null && "error" in structureResult) {
+        console.error("🔍 DIAGNÓSTICO - Error en structureResult:", structureResult.error)
         setError(structureResult.error)
       }
+      // Caso inesperado
+      else {
+        console.error(
+          "🔍 DIAGNÓSTICO - Formato inesperado de structureResult:",
+          typeof structureResult,
+          structureResult,
+        )
+        setError("Formato de respuesta inesperado del servicio de IA")
+      }
     } catch (error: any) {
-      console.error("Error generando estructura:", error)
-      setError(`Error al generar estructura: ${error.message || "Error desconocido"}`)
+      console.error("🔍 DIAGNÓSTICO - Error en handleGenerateStructure:", error)
+      const errorMessage = error?.message || error?.toString() || "Error desconocido"
+      setError(`Error al generar estructura: ${errorMessage}`)
     } finally {
       setIsGeneratingStructure(false)
     }

@@ -1,95 +1,141 @@
 "use server"
 
-import OpenAI from "openai"
 import { generateTextWithAI } from "@/services/unified-ai-service"
 import type { CourseData, CourseModule } from "@/types/course"
 
 export async function generateCourseStructure(courseData: CourseData): Promise<CourseModule[] | { error: string }> {
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-
-  const { title, theoreticalContext, practicalContext } = courseData
-  if (!title) {
-    return { error: "Se requiere un título para generar la estructura del curso." }
-  }
-
-  const prompt = `
-    Actúa como un diseñador instruccional experto. Tu tarea es diseñar una estructura de módulos detallada para un curso titulado "${title}".
-    
-    CONTEXTO PROPORCIONADO POR EXPERTOS:
-    - Contexto Teórico (de un catedrático): ${theoreticalContext || "No proporcionado. Basa tu estructura en conocimiento general sobre el tema."}
-    - Contexto Práctico (de un consultor de industria): ${practicalContext || "No proporcionado."}
-    
-    INSTRUCCIONES CRÍTICAS:
-    1. Sintetiza la información de AMBOS contextos para crear una estructura de curso lógica y coherente.
-    2. La estructura debe consistir en 4-8 módulos principales.
-    3. Para cada módulo, proporciona un título claro y una descripción detallada (2-3 frases) de sus contenidos.
-    4. OBLIGATORIO: Devuelve ÚNICAMENTE un array JSON válido con el siguiente formato exacto:
-    
-    [
-      {
-        "moduleName": "Título del módulo 1",
-        "moduleDescription": "Descripción detallada del módulo 1 que explique qué aprenderán los estudiantes y qué temas se cubrirán."
-      },
-      {
-        "moduleName": "Título del módulo 2", 
-        "moduleDescription": "Descripción detallada del módulo 2 que explique qué aprenderán los estudiantes y qué temas se cubrirán."
-      }
-    ]
-    
-    5. NO incluyas texto adicional, explicaciones o formato markdown. Solo el JSON válido.
-    6. Asegúrate de que el JSON sea parseable y válido.
-  `
-
   try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [{ role: "system", content: prompt }],
-      temperature: 0.3, // Reducir temperatura para respuestas más consistentes
-      max_tokens: 1500,
+    console.log("🔍 DIAGNÓSTICO - generateCourseStructure iniciado con:", courseData.title)
+
+    const { title, theoreticalContext, practicalContext } = courseData
+    if (!title) {
+      return { error: "Se requiere un título para generar la estructura del curso." }
+    }
+
+    // Crear un prompt más robusto
+    const systemPrompt = `Eres un diseñador instruccional experto. Tu tarea es crear una estructura de módulos para un curso educativo.
+
+INSTRUCCIONES CRÍTICAS:
+1. Debes devolver ÚNICAMENTE un array JSON válido con la estructura exacta especificada.
+2. NO incluyas texto adicional, explicaciones o formato markdown.
+3. El JSON debe ser parseable directamente.
+4. Cada módulo debe tener exactamente las propiedades: moduleName y moduleDescription.`
+
+    const prompt = `
+Crea una estructura de 4-6 módulos para un curso titulado "${title}".
+
+${theoreticalContext ? `Contexto Teórico: ${theoreticalContext}` : ""}
+${practicalContext ? `Contexto Práctico: ${practicalContext}` : ""}
+
+Información adicional del curso:
+- Audiencia: ${courseData.audience || "No especificada"}
+- Problema que resuelve: ${courseData.problem || "No especificado"}
+- Propósito: ${courseData.purpose || "No especificado"}
+
+Devuelve ÚNICAMENTE un array JSON con este formato exacto:
+[
+  {
+    "moduleName": "Título del módulo 1",
+    "moduleDescription": "Descripción detallada del módulo 1 que explique qué aprenderán los estudiantes."
+  },
+  {
+    "moduleName": "Título del módulo 2", 
+    "moduleDescription": "Descripción detallada del módulo 2 que explique qué aprenderán los estudiantes."
+  }
+]
+
+IMPORTANTE: Responde SOLO con el JSON, sin texto adicional.`
+
+    console.log("🔍 DIAGNÓSTICO - Llamando a generateTextWithAI...")
+
+    // Usar el servicio unificado de IA
+    const result = await generateTextWithAI(prompt, systemPrompt, {
+      provider: "openai", // Preferir OpenAI para JSON estructurado
+      fallbackProviders: ["cohere", "anthropic", "google"],
+      maxTokens: 1500,
+      temperature: 0.3, // Temperatura baja para respuestas más consistentes
     })
 
-    const content = response.choices[0].message.content || ""
+    console.log("🔍 DIAGNÓSTICO - Respuesta de IA recibida:", result.text.substring(0, 200) + "...")
+
+    if (!result.text) {
+      console.error("🔍 DIAGNÓSTICO - Respuesta vacía de la IA")
+      return { error: "No se recibió respuesta de la IA." }
+    }
+
+    // Limpiar la respuesta para extraer solo el JSON
+    let cleanedResponse = result.text.trim()
+
+    // Remover posibles bloques de código markdown
+    const jsonMatch = cleanedResponse.match(/```(?:json)?\s*([\s\S]*?)\s*```/)
+    if (jsonMatch) {
+      cleanedResponse = jsonMatch[1].trim()
+    }
 
     // Intentar parsear el JSON
     try {
-      const modules = JSON.parse(content) as CourseModule[]
+      const modules = JSON.parse(cleanedResponse) as CourseModule[]
 
-      // Validar que sea un array y que tenga la estructura correcta
+      // Validar que sea un array
       if (!Array.isArray(modules)) {
-        throw new Error("La respuesta no es un array")
+        console.error("🔍 DIAGNÓSTICO - La respuesta no es un array:", typeof modules)
+        throw new Error("La respuesta no es un array válido")
       }
 
       // Validar cada módulo
-      for (const module of modules) {
-        if (!module.moduleName || !module.moduleDescription) {
-          throw new Error("Estructura de módulo inválida")
+      for (let i = 0; i < modules.length; i++) {
+        const module = modules[i]
+        if (!module || typeof module !== "object") {
+          console.error(`🔍 DIAGNÓSTICO - Módulo ${i} no es un objeto válido:`, module)
+          throw new Error(`Módulo ${i + 1} no es válido`)
+        }
+
+        if (!module.moduleName || typeof module.moduleName !== "string") {
+          console.error(`🔍 DIAGNÓSTICO - Módulo ${i} no tiene moduleName válido:`, module.moduleName)
+          throw new Error(`Módulo ${i + 1} no tiene un nombre válido`)
+        }
+
+        if (!module.moduleDescription || typeof module.moduleDescription !== "string") {
+          console.error(`🔍 DIAGNÓSTICO - Módulo ${i} no tiene moduleDescription válido:`, module.moduleDescription)
+          throw new Error(`Módulo ${i + 1} no tiene una descripción válida`)
         }
       }
 
+      console.log("🔍 DIAGNÓSTICO - Estructura validada exitosamente:", modules.length, "módulos")
       return modules
     } catch (parseError) {
-      console.error("Error parsing JSON from AI:", parseError)
-      console.error("AI Response:", content)
+      console.error("🔍 DIAGNÓSTICO - Error parseando JSON:", parseError)
+      console.error("🔍 DIAGNÓSTICO - Respuesta limpia:", cleanedResponse)
 
-      // Fallback: intentar extraer información y crear estructura manualmente
-      return [
+      // Fallback: crear estructura básica
+      const fallbackModules: CourseModule[] = [
         {
           moduleName: "Módulo 1: Introducción",
-          moduleDescription: "Introducción a los conceptos fundamentales del curso.",
+          moduleDescription: `Introducción a los conceptos fundamentales de ${title}. Los estudiantes conocerán los objetivos del curso y las bases teóricas necesarias.`,
         },
         {
-          moduleName: "Módulo 2: Desarrollo",
-          moduleDescription: "Desarrollo de habilidades y conocimientos intermedios.",
+          moduleName: "Módulo 2: Fundamentos",
+          moduleDescription: `Desarrollo de los conocimientos básicos sobre ${title}. Se cubrirán los principios y metodologías esenciales.`,
         },
         {
-          moduleName: "Módulo 3: Aplicación",
-          moduleDescription: "Aplicación práctica de los conocimientos adquiridos.",
+          moduleName: "Módulo 3: Aplicación Práctica",
+          moduleDescription: `Aplicación práctica de los conocimientos adquiridos. Los estudiantes trabajarán en ejercicios y casos de estudio reales.`,
+        },
+        {
+          moduleName: "Módulo 4: Proyecto Final",
+          moduleDescription: `Integración de todos los conocimientos en un proyecto final. Los estudiantes demostrarán su dominio del tema.`,
         },
       ]
+
+      console.log("🔍 DIAGNÓSTICO - Usando estructura fallback")
+      return fallbackModules
     }
-  } catch (error) {
-    console.error("Error generating course structure:", error)
-    return { error: "No se pudo contactar al servicio de IA para generar la estructura del curso." }
+  } catch (error: any) {
+    console.error("🔍 DIAGNÓSTICO - Error general en generateCourseStructure:", error)
+
+    // Asegurar que siempre devolvemos un objeto con error
+    const errorMessage = error?.message || error?.toString() || "Error desconocido al generar la estructura"
+    return { error: `Error al generar estructura: ${errorMessage}` }
   }
 }
 
@@ -113,7 +159,7 @@ export async function generateMaterialSuggestions(
     const systemPrompt = `Eres un diseñador instruccional experto especializado en crear materiales educativos que conecten efectivamente la teoría con la práctica. Tu misión es diseñar una lista de materiales y recursos altamente relevantes para un curso específico.`
 
     // Convertir estructura de módulos a string para el prompt
-    const structureText = courseData.structure
+    const structureText = Array.isArray(courseData.structure)
       ? courseData.structure
           .map((module, index) => `${index + 1}. ${module.moduleName}: ${module.moduleDescription}`)
           .join("\n")
@@ -181,45 +227,44 @@ Formato la respuesta como una lista con viñetas (usando guiones), un material p
 }
 
 export async function generateEvaluationMethod(courseData: CourseData): Promise<string | { error: string }> {
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-
-  const { title, theoreticalContext, practicalContext, structure } = courseData
-  if (!title || !structure) {
-    return { error: "Se requiere el título y la estructura del curso para generar métodos de evaluación." }
-  }
-
-  // Convertir estructura de módulos a string para el prompt
-  const structureText = structure
-    .map((module, index) => `${index + 1}. ${module.moduleName}: ${module.moduleDescription}`)
-    .join("\n")
-
-  const prompt = `
-    Actúa como un diseñador instruccional experto especializado en evaluación educativa.
-    Tu tarea es diseñar métodos de evaluación para un curso titulado "${title}".
-    
-    CONTEXTO DEL CURSO:
-    - Contexto Teórico: ${theoreticalContext || "No proporcionado."}
-    - Contexto Práctico: ${practicalContext || "No proporcionado."}
-    - Estructura del Curso: 
-    ${structureText}
-    
-    Basándote en TODA la información anterior, genera una lista de métodos de evaluación variados y efectivos.
-    Incluye una mezcla de evaluación formativa (para medir el progreso durante el curso) y sumativa (para medir el resultado final).
-    Para cada método, describe brevemente cómo se implementaría y qué objetivo de aprendizaje específico evalúa.
-    
-    La salida debe ser en formato Markdown.
-  `
-
   try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [{ role: "system", content: prompt }],
+    const { title, theoreticalContext, practicalContext, structure } = courseData
+    if (!title) {
+      return { error: "Se requiere el título del curso para generar métodos de evaluación." }
+    }
+
+    // Convertir estructura de módulos a string para el prompt si existe
+    const structureText = Array.isArray(structure)
+      ? structure.map((module, index) => `${index + 1}. ${module.moduleName}: ${module.moduleDescription}`).join("\n")
+      : "No especificada"
+
+    const systemPrompt = `Eres un diseñador instruccional experto especializado en evaluación educativa. Tu tarea es diseñar métodos de evaluación para un curso específico.`
+
+    const prompt = `
+Diseña métodos de evaluación para un curso titulado "${title}".
+
+CONTEXTO DEL CURSO:
+- Contexto Teórico: ${theoreticalContext || "No proporcionado."}
+- Contexto Práctico: ${practicalContext || "No proporcionado."}
+- Estructura del Curso: 
+${structureText}
+
+Basándote en TODA la información anterior, genera una lista de métodos de evaluación variados y efectivos.
+Incluye una mezcla de evaluación formativa (para medir el progreso durante el curso) y sumativa (para medir el resultado final).
+Para cada método, describe brevemente cómo se implementaría y qué objetivo de aprendizaje específico evalúa.
+
+La salida debe ser en formato Markdown.
+`
+
+    const result = await generateTextWithAI(prompt, systemPrompt, {
+      provider: "openai",
+      fallbackProviders: ["cohere", "anthropic", "google"],
+      maxTokens: 800,
       temperature: 0.7,
-      max_tokens: 800,
     })
 
-    return response.choices[0].message.content || "No se pudieron generar sugerencias."
-  } catch (error) {
+    return result.text || "No se pudieron generar sugerencias."
+  } catch (error: any) {
     console.error("Error generating evaluation methods:", error)
     return { error: "No se pudo contactar al servicio de IA para generar sugerencias de evaluación." }
   }
